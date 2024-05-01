@@ -63,23 +63,38 @@ CREATE TABLE experiment (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Проверка существования measurements и удаление, если она существует
+-- Проверка существования steps и удаление, если она существует
 DO $$ 
 BEGIN 
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'measurements') THEN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'steps') THEN
         -- Удаление таблицы
-        EXECUTE 'DROP TABLE measurements';
+        EXECUTE 'DROP TABLE steps';
     END IF;
 END $$;
 
 -- Создание таблицы
-CREATE TABLE measurements (
+CREATE TABLE steps (
     id SERIAL PRIMARY KEY,
 	exp_id INTEGER REFERENCES experiment(id),
     start_time TIME,
 	step INT,
-	delay_pulses INT,
-	reper_energy FLOAT,
-    analyt_energy FLOAT,
-    rep_analyt_ratio FLOAT
+	delay_pulses INT
+);
+
+-- Проверка существования pulses и удаление, если она существует
+DO $$ 
+BEGIN 
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'pulses') THEN
+        -- Удаление таблицы
+        EXECUTE 'DROP TABLE pulses';
+    END IF;
+END $$;
+
+-- Создание таблицы
+CREATE TABLE pulses (
+    id SERIAL PRIMARY KEY,
+	step_id INTEGER REFERENCES steps(id),
+	pulses JSONB,
+    analyt_amp FLOAT,
+    reper_amp FLOAT
 );
