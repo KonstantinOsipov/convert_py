@@ -23,38 +23,39 @@ data = {
     'array_element_3': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321],
     'array_element_n': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321]
 }
-
 df = pd.DataFrame(data)
 print(df)
 
+# Get unique step values from the DataFrame
+unique_steps = df['step'].unique()
 
-# Создадим словарь для объединения данных по каждому шагу и каналу
-steps_dict = {}
+# Initialize the final output dictionary
+final_output = {}
 
-# Итерируем по уникальным значениям шагов и создаем словарь для каждого шага
-for step in df['step'].unique():
-    step_data = df[df['step'] == step]
-    step_dict = {
-        "step": step,
-        "pulses": {
-            "impulse": 0,
-            "impulse_reper": [],
-            "impulse_analyt": []
-        },
-        "amplitude_reper": step_data.loc[step_data['channel'] == 'Reper', 'amplitude'],
-        "amplitude_analyt": step_data.loc[step_data['channel'] == 'Analyt', 'amplitude']
+# Iterate over each unique step value
+for step_value in unique_steps:
+    df_step = df[df['step'] == step_value]
+
+    # Initialize the dictionary structure for the current step
+    output_dict = {
+        "step": step_value,
+        "pulses": []
     }
+
+    # Iterate over each row in the filtered DataFrame for the current step
+    for index, row in df_step.iterrows():
+        pulse_dict = {
+            "pulse": row['Impulse'],
+            "pulses": {
+                "impulse_reper": [],
+                "impulse_analyt": []
+            },
+            "amplitude_reper": row['amplitude'] if row['Channel'] == 'Reper' else None,
+            "amplitude_analyt": row['amplitude'] if row['Channel'] == 'Analyt' else None
+        }
+        output_dict["pulses"].append(pulse_dict)
     
-    for index, row in step_data.iterrows():
-        if row['channel'] == 'Reper':
-            impulse_reper = [row[col] for col in row.index if col.startswith('impulse_array_element_')]
-            step_dict["pulses"]["impulse_reper"].append(impulse_reper)
-        elif row['channel'] == 'Analyt':
-            impulse_analyt = [row[col] for col in row.index if col.startswith('impulse_array_element_')]
-            step_dict["pulses"]["impulse_analyt"].append(impulse_analyt)
+    # Add the current step's output to the final output dictionary
+    final_output[f"step_{step_value}"] = output_dict
 
-    steps_dict[step] = step_dict
-print(steps_dict)
-
-json_data = json.dumps(steps_dict, indent=4)
-print(json_data)
+print(final_output)
