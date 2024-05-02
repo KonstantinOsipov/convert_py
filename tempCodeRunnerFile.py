@@ -1,2 +1,2 @@
-
-        files_dict[name] = [file_name]
+print(
+#     impulses.head()) #Вот тут надо что-то делать с этим большим файлом.

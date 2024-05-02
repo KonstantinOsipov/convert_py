@@ -92,7 +92,9 @@ for index, value in enumerate(files_dict.values()):
     impulses = pd.read_csv(os.path.join(source_folder, value[2]), delimiter=',', header=None)
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
     impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
-    print(value[2])
+    print(value[2]) #Вот тут надо что-то делать с этим большим файлом.
+
+
     step_data = pd.read_csv(os.path.join(source_folder, value[0]), delimiter='\t', header=None)
     step_data.columns = ['step_time', 'Step', 'A_Reper', 'A_Analyt', 'Ratio']
     exp_id = exp_id
