@@ -14,16 +14,19 @@ print(
      impulses.head()) #Вот тут надо что-то делать с этим большим файлом.
 
 data = {
-    'step': [0, 0, 1, 1, 2, 2],  # Пример значений шагов, повторяющихся три раза
-    'amplitude': [100, 1.6, 150, 2.2, 200, 2.2],  # Пример значений амплитуды
-    'channel': ['Reper', 'Analyt', 'Reper', 'Analyt', 'Reper', 'Analyt'],
-    'impulse_array_element_1': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2],
-    'impulse_array_element_2': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2],
-    'impulse_array_element_3': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2],
-    'impulse_array_element_n': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2]
+    'Impulse': [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
+    'Channel': ['Reper', 'Analyt', 'Reper', 'Analyt', 'Reper', 'Analyt', 'Reper', 'Analyt', 'Reper', 'Analyt', 'Reper', 'Analyt'],
+    'step': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  
+    'amplitude': [100, 1.6, 150, 2.2, 200, 2.2, 100, 1.6, 150, 2.2, 200, 2.2],  
+    'array_element_1': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321],
+    'array_element_2': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321],
+    'array_element_3': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321],
+    'array_element_n': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321]
 }
 
 df = pd.DataFrame(data)
+print(df)
+
 
 # Создадим словарь для объединения данных по каждому шагу и каналу
 steps_dict = {}
@@ -34,6 +37,7 @@ for step in df['step'].unique():
     step_dict = {
         "step": step,
         "pulses": {
+            "impulse": 0,
             "impulse_reper": [],
             "impulse_analyt": []
         },
