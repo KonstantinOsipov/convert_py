@@ -10,54 +10,28 @@ impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 60
 impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
 
 impulses['Sum'] = impulses.iloc[:,8:63].sum(axis=1)
+print(impulses.head)
 
-# print(
-#      impulses.head()) #Вот тут надо что-то делать с этим большим файлом.
-
-names = ["Amplitude", "el_1", "el_2", "el_3", "el_4"]
-random_lists = [[round(random.uniform(1.0, 100.0),2) for _ in range(24)] for _ in range(len(names))]
-result = dict(zip(names, random_lists))
-
-data = {
-    'Impulse': [item for i in range(6) for item in [i]*2]*2,
-    'Channel': ['Reper', 'Analyt']*12,
-    'step': [0]*12 + [1]*12
-}
-data.update(result)
-
-df = pd.DataFrame(data)
-print(df)
-
-# Get unique step values from the DataFrame
-unique_steps = df['step'].unique()
-
+unique_steps = impulses['Step'].unique()
 # Initialize the final output dictionary
 final_output = {}
-
-# Iterate over each unique step value
 for step_value in unique_steps:
-    df_step = df[df['step'] == step_value]
-
-    # Initialize the dictionary structure for the current step
+    df_step = impulses[impulses['Step'] == step_value]
     output_dict = {
         "step": step_value,
         "pulses": []
     }
-
-    # Iterate over each row in the filtered DataFrame for the current step
-    for index, row in df_step.iterrows():
-        pulse_dict = {
-            "pulse": row['Impulse'],
-            "pulses": {
-                "impulse_reper": [],
-                "impulse_analyt": []
-            },
-            "amplitude_reper": row['amplitude'] if row['Channel'] == 'Reper' else None,
-            "amplitude_analyt": row['amplitude'] if row['Channel'] == 'Analyt' else None
-        }
-        output_dict["pulses"].append(pulse_dict)
-    
-    # Add the current step's output to the final output dictionary
-    final_output[f"step_{step_value}"] = output_dict
-
-print(final_output)
+    for impulse_value in df_step['Impulse'].unique():
+      df_impulse = df_step[df_step['Impulse'] == impulse_value]
+      pulses_dict={"pulse": impulse_value,
+                  "pulses": {
+                      "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,4:604].values.flatten().tolist(),
+                      "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,4:604].values.flatten().tolist(),
+                  },
+                  "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],4),
+                  "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],4)
+                  }
+      output_dict['pulses'].append(pulses_dict)
+    final_output[str(f"step_{step_value}")] = output_dict
+# with open('final_output.json', 'w') as file:
+#     json.dump(final_output, file, separators=(',', ':'))
