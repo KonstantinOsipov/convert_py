@@ -1,3 +1,4 @@
+import random
 import pandas as pd
 import os
 import json
@@ -10,19 +11,20 @@ impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel
 
 impulses['Sum'] = impulses.iloc[:,8:63].sum(axis=1)
 
-print(
-     impulses.head()) #Вот тут надо что-то делать с этим большим файлом.
+# print(
+#      impulses.head()) #Вот тут надо что-то делать с этим большим файлом.
+
+names = ["Amplitude", "el_1", "el_2", "el_3", "el_4"]
+random_lists = [[round(random.uniform(1.0, 100.0),2) for _ in range(24)] for _ in range(len(names))]
+result = dict(zip(names, random_lists))
 
 data = {
-    'Impulse': [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5],
-    'Channel': ['Reper', 'Analyt', 'Reper', 'Analyt', 'Reper', 'Analyt', 'Reper', 'Analyt', 'Reper', 'Analyt', 'Reper', 'Analyt'],
-    'step': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  
-    'amplitude': [100, 1.6, 150, 2.2, 200, 2.2, 100, 1.6, 150, 2.2, 200, 2.2],  
-    'array_element_1': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321],
-    'array_element_2': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321],
-    'array_element_3': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321],
-    'array_element_n': [1.5, 1.6, 2.1, 2.2, 2.0, 2.2, 7.894, 3.678, 5.234, 9.123, 0.567, 4.321]
+    'Impulse': [item for i in range(6) for item in [i]*2]*2,
+    'Channel': ['Reper', 'Analyt']*12,
+    'step': [0]*12 + [1]*12
 }
+data.update(result)
+
 df = pd.DataFrame(data)
 print(df)
 
