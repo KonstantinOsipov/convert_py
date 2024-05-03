@@ -94,7 +94,6 @@ for index, value in enumerate(files_dict.values()):
     impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
     print(value[2]) #Вот тут надо что-то делать с этим большим файлом.
 
-
     step_data = pd.read_csv(os.path.join(source_folder, value[0]), delimiter='\t', header=None)
     step_data.columns = ['step_time', 'Step', 'A_Reper', 'A_Analyt', 'Ratio']
     exp_id = exp_id
@@ -111,8 +110,34 @@ for index, value in enumerate(files_dict.values()):
             break
 
         #А теперь в каждый шаг нужно добавлять импульсы из элемента value[2]. (В этом же цикле). Надо бы этот файл отдельно пообрабатывать в pandas. 
-        #Тут непонятно. проще наверное сначала этот большой объект прочитать а потом INSERT-ить данные в таблицу Steps, и pulses .. 
+        #Тут понятно. проще наверное сначала этот большой объект прочитать а потом INSERT-ить данные в таблицу Steps, и pulses .. 
     
+    impulses = pd.read_csv(os.path.join(source_folder, value[2]), delimiter=',', header=None)
+    impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
+    impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
+    impulses['Sum'] = impulses.iloc[:,8:63].sum(axis=1)
+    print(impulses.head(3))
+    unique_steps = impulses['Step'].unique()
+    # Initialize the final output dictionary
+    final_output = {}
+    for step_value in unique_steps:
+        df_step = impulses[impulses['Step'] == step_value]
+        output_dict = {
+            "step": step_value,
+            "pulses": []
+        }
+        for impulse_value in df_step['Impulse'].unique():
+            df_impulse = df_step[df_step['Impulse'] == impulse_value]
+            pulses_dict={"pulse": impulse_value,
+                        "pulses": {
+                            "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,4:604].values.flatten().tolist(),
+                            "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,4:604].values.flatten().tolist(),
+                        },
+                        "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],4),
+                        "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],4)
+                        }
+            output_dict['pulses'].append(pulses_dict)
+        final_output[str(f"step_{step_value}")] = output_dict #Вот из этого объекта легко получим все данные.
 
-    if index == 2:
+    if index >= 1:
         break
