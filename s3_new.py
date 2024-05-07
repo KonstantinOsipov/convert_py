@@ -132,13 +132,25 @@ for index, value in enumerate(files_dict.values()):
         cur.execute(insert_query, data)
         inserted_record = cur.fetchone()
         step_id = inserted_record[0]
-        print(raw_object[raw_object_keys[idx]]['pulses'])
-        if idx == 3:
+        impulse_object = raw_object[raw_object_keys[idx]]
+        tuple_data=[]
+        for i in impulse_object['pulses']:
+            data = (
+                step_id,
+                json.dumps(i['pulses']),
+                i['amplitude_analyt'], 
+                i['amplitude_reper'], 
+                )
+            tuple_data.append(data)
+        insert_query = "INSERT INTO pulses (step_id, pulses, reper_amp, analyt_amp) VALUES (%s, %s, %s, %s)"
+        cur.executemany(insert_query, tuple_data)
+        conn.commit()
+        if idx == 20:
             break
 
         #А теперь в каждый шаг нужно добавлять импульсы из элемента value[2]. (В этом же цикле). Надо бы этот файл отдельно пообрабатывать в pandas. 
         #Тут понятно. проще наверное сначала этот большой объект прочитать а потом INSERT-ить данные в таблицу Steps, и pulses .. 
     
 
-    if index >= 1:
+    if index > 3:
         break
