@@ -6,7 +6,7 @@ import json
 import shutil
 import psycopg2
 from datetime import datetime
-
+#Внимание! 01.05.2024 Поменял структуру БД. Эти файлы должны записываться в новую структуру. И по файлам JSON получается
 #Открываем папку. Считываем все .dat. И складываем в DataFrame
 source_folder = 'd:/Work/2023/TimeWeb_data/'
 files = os.listdir(source_folder)
