@@ -138,10 +138,16 @@ for index, row in result_2.iterrows():
             step = {
                     "step": data_json["Numeric"],
                     "timestamp": (data_json["date/time string"])[0:11],
-                    "A_Reper": data_full_tr.loc['A_Reper',i[1]],
-                    "A_Analyt": data_full_tr.loc['A_Analyt',i[1]],
                     "Ratio": data_full_tr.loc['Ratio',i[1]],
-                    "Smoothed": (data_json["0-Rep;1-Sig"])
+                        "pulses": [{'pulse':0,
+                                    "amplitude_reper": data_full_tr.loc['A_Reper',i[1]],
+                                    "amplitude_analyt": data_full_tr.loc['A_Analyt',i[1]],
+                                    'pulses':
+                                    {'impulse_reper': data_json["0-Rep;1-Sig"][0],
+                                     'impulse_analyt': data_json["0-Rep;1-Sig"][1]
+                                    }
+                                }
+                                ]
                     #Данные с сигналами убраны из структуры json. Надо воткнуть smoothed обратно.                 
                     }
             #Записываем данные в таблицу measurements
@@ -157,9 +163,9 @@ for index, row in result_2.iterrows():
                 # data_full_tr.loc['Ratio',i[1]].replace(",", ".")
             )
             cur.execute(insert_query, data)
-            conn.commit()
-            df_reper[step['step']] = data_json["0-Rep;1-Sig"][0]
-            df_analyt[step['step']] = data_json["0-Rep;1-Sig"][1]
+            conn.commit() #закомментирую пока, не знаю что это
+#           df_reper[step['step']] = data_json["0-Rep;1-Sig"][0]
+#           df_analyt[step['step']] = data_json["0-Rep;1-Sig"][1]
             steps.append(step)
         except TypeError:
             pass
@@ -178,10 +184,7 @@ for index, row in result_2.iterrows():
     #   file.write(json_data)
         json.dump(my_measurement, file)
     print('Записан файл...' + output_filename)
-    df_reper.to_csv(reper_file,index=False)
-    df_analyt.to_csv(analyt_file,index=False)
-
-    if index == 5:
+    if index == 2:
         break
 cur.close()
 conn.close()

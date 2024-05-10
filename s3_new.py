@@ -16,11 +16,11 @@ except:
 # получение объекта курсора
 cur = conn.cursor()
 
-#Открываем SQL-скрипта для удаления и создания таблиц
-with open('create_tables_script_31.12.sql', 'r') as file:
-    script = file.read()
-cur.execute(script)
-conn.commit()
+#Открываем SQL-скрипта для удаления и создания таблиц. Не будем делать этого.
+# with open('create_tables_script_31.12.sql', 'r') as file:
+#     script = file.read()
+# cur.execute(script)
+# conn.commit()
 
 #Через S3 не получается. Все равно нужно копировать файлы чтоыб их распаковать
 #Указываем папку с файлами. Считываем все *.dat . И складываем в DataFrame
@@ -68,9 +68,11 @@ def raw_file(element):
             output_dict['pulses'].append(pulses_dict)
         final_output[str(f"step_{step_value}")] = output_dict #Вот из этого объекта легко получим все данные.
     return final_output
-#Дальше идем по объектам, считываем эти файлы, и записываем в БД
+#Дальше идем по объектам, считываем эти файлы, и записываем в БД. Нужно добавить создание JSON файлы для каждого эксперимента.
 for index, value in enumerate(files_dict.values()):
     data_impulse = pd.read_csv(os.path.join(source_folder, value[1]), delimiter='\t', header=None)
+    output_filename = os.path.join(source_folder, value[0][5:-4] + ".json")
+    print(output_filename)
     #Сначала заполним данные в таблицу calculations
     #из первого шага/блока получаем accum и slide
     match = re.search(r'_accum=(\d+)_slide=(\d+)', json.loads(data_impulse.iloc[0,0])["date/time string"])
@@ -142,13 +144,16 @@ for index, value in enumerate(files_dict.values()):
                 i['amplitude_reper'], 
                 )
             tuple_data.append(data)
-        insert_query = "INSERT INTO pulses (step_id, pulses, reper_amp, analyt_amp) VALUES (%s, %s, %s, %s)"
-        cur.executemany(insert_query, tuple_data)
-        conn.commit()
-        if idx == 20:
+#       insert_query = "INSERT INTO pulses (step_id, reper_amp, analyt_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
+#       cur.executemany(insert_query, tuple_data)
+#       conn.commit()
+        with open(output_filename, 'w') as file:
+            json.dump(tuple_data, file)
+        print('Записан файл...' + output_filename)
+        if idx == 2:
             break
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 3:
+    if index > 2:
         break
