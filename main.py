@@ -54,7 +54,7 @@ def find_last_index(text):
 
 try:
     # пытаемся подключиться к базе данных
-    conn = psycopg2.connect("dbname=experimentdb user=kokos password=Mov@lis28 host=92.118.115.115")
+    conn = psycopg2.connect("dbname=experiments user=kokos password=jumbo host=92.118.115.115 port=5531")
     print('Соединение установлено...!')
 except:
     # в случае сбоя подключения
@@ -142,17 +142,19 @@ for index, row in result_2.iterrows():
                     "A_Analyt": data_full_tr.loc['A_Analyt',i[1]],
                     "Ratio": data_full_tr.loc['Ratio',i[1]],
                     "Smoothed": (data_json["0-Rep;1-Sig"])
-                    #Данные с сигналами убраны из структуры json                  
+                    #Данные с сигналами убраны из структуры json. Надо воткнуть smoothed обратно.                 
                     }
             #Записываем данные в таблицу measurements
-            insert_query = "INSERT INTO measurements (exp_id, start_time, step, reper_energy, analyt_energy, rep_analyt_ratio) VALUES (%s, %s, %s, %s, %s, %s)"
+            delay_pulses = 200
+            insert_query = "INSERT INTO steps (exp_id, start_time, step, delay_pulses) VALUES (%s, %s, %s, %s)"
             data = (
                 exp_id,
                 (data_json["date/time string"])[0:11].replace(",", "."),
-                data_json["Numeric"],
-                data_full_tr.loc['A_Reper',i[1]].replace(",", "."),
-                data_full_tr.loc['A_Analyt',i[1]].replace(",", "."),
-                data_full_tr.loc['Ratio',i[1]].replace(",", ".")
+                data_json["Numeric"], # это шаг. 
+                delay_pulses
+                # data_full_tr.loc['A_Reper',i[1]].replace(",", "."),
+                # data_full_tr.loc['A_Analyt',i[1]].replace(",", "."),
+                # data_full_tr.loc['Ratio',i[1]].replace(",", ".")
             )
             cur.execute(insert_query, data)
             conn.commit()
@@ -162,8 +164,6 @@ for index, row in result_2.iterrows():
         except TypeError:
             pass
     output_filename = os.path.join(output_folder, row['Impulse'][13:-4] + ".json")
-    
-
     my_measurement = {
         'slide': slide,
         'accum_pulses': accum,
