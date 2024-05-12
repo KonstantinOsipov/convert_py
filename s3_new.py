@@ -135,7 +135,7 @@ for index, value in enumerate(files_dict.values()):
         inserted_record = cur.fetchone()
         step_id = inserted_record[0]
         impulse_object = raw_object[raw_object_keys[idx]]
-        tuple_data=[]
+        tuple_data=[] #Какая тут тебе разница, кортеж использовать или словарь? 
         for i in impulse_object['pulses']:
             data = (
                 step_id,
@@ -147,11 +147,11 @@ for index, value in enumerate(files_dict.values()):
 #       insert_query = "INSERT INTO pulses (step_id, reper_amp, analyt_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
 #       cur.executemany(insert_query, tuple_data)
 #       conn.commit()
-        with open(output_filename, 'w') as file:
-            json.dump(tuple_data, file)
-        print('Записан файл...' + output_filename)
-        if idx == 2:
+        if idx == 5:
             break
+    with open(output_filename, 'w') as file:
+        json.dump(tuple_data, file)
+    print('Записан файл...' + output_filename)
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
