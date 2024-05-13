@@ -59,8 +59,8 @@ def raw_file(element):
             df_impulse = df_step[df_step['Impulse'] == impulse_value]
             pulses_dict={"pulse": impulse_value,
                         "pulses": {
-                            "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,4:604].values.flatten().tolist(),
-                            "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,4:604].values.flatten().tolist(),
+                            "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
+                            "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
                         },
                         "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],4),
                         "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],4)
@@ -125,7 +125,12 @@ for index, value in enumerate(files_dict.values()):
     step_data = pd.read_csv(os.path.join(source_folder, value[0]), delimiter='\t', header=None)
     step_data.columns = ['step_time', 'Step', 'A_Reper', 'A_Analyt', 'Ratio']
     exp_id = exp_id
+    steps = []
     for idx, step in step_data.iterrows():
+        step_0 = {"step": idx,
+                  "timestamp": step['step_time'],
+                  "pulses": [] 
+                  }
         start_time = step['step_time']
         step = step['Step'] # Тут по хорошему надо будет сделать И номер И позицию.
         delay_pulses = 200
@@ -135,22 +140,39 @@ for index, value in enumerate(files_dict.values()):
         inserted_record = cur.fetchone()
         step_id = inserted_record[0]
         impulse_object = raw_object[raw_object_keys[idx]]
-        tuple_data=[] #Какая тут тебе разница, кортеж использовать или словарь? 
-        for i in impulse_object['pulses']:
+        tuple_data=[] #Сделать еще одну структуру словарь для записи JSON 
+        for i, j in enumerate(impulse_object['pulses']):
+            data_dict = {"pulse": i,
+                        "pulses": j['pulses'],
+                        "amplitude_reper": j['amplitude_reper'],
+                        "amplitude_analyt": j['amplitude_analyt']
+                  }
+            step_0["pulses"].append(data_dict)
             data = (
                 step_id,
-                json.dumps(i['pulses']),
-                i['amplitude_analyt'], 
-                i['amplitude_reper'], 
+                json.dumps(j['pulses']),
+                j['amplitude_analyt'], 
+                j['amplitude_reper'], 
                 )
             tuple_data.append(data)
+            if i > 10:
+                break
+        print(f'Размер tuple data = _{len(tuple_data)}')
+        steps.append(step_0)
 #       insert_query = "INSERT INTO pulses (step_id, reper_amp, analyt_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
 #       cur.executemany(insert_query, tuple_data)
 #       conn.commit()
-        if idx == 5:
+        if idx == 10:
             break
+    #Данные в JSON файл: 
+    my_measurement = {
+        'slide': slide,
+        'accum_pulses': accum,
+        'comment': description,
+        'timestamp': value[0][-21:-4],
+        'steps': steps}
     with open(output_filename, 'w') as file:
-        json.dump(tuple_data, file)
+        json.dump(my_measurement, file)
     print('Записан файл...' + output_filename)
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
