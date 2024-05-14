@@ -129,7 +129,7 @@ for index, value in enumerate(files_dict.values()):
     for idx, step in step_data.iterrows():
         step_0 = {"step": idx,
                   "timestamp": step['step_time'],
-                  "pulses": [] 
+                  "pulses": []
                   }
         start_time = step['step_time']
         step = step['Step'] # Тут по хорошему надо будет сделать И номер И позицию.
@@ -155,14 +155,14 @@ for index, value in enumerate(files_dict.values()):
                 j['amplitude_reper'], 
                 )
             tuple_data.append(data)
-            if i > 10:
-                break
+            # if i > 10:
+            #     break
         print(f'Размер tuple data = _{len(tuple_data)}')
         steps.append(step_0)
 #       insert_query = "INSERT INTO pulses (step_id, reper_amp, analyt_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
 #       cur.executemany(insert_query, tuple_data)
 #       conn.commit()
-        if idx == 10:
+        if idx == 20:
             break
     #Данные в JSON файл: 
     my_measurement = {
@@ -177,5 +177,5 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 2:
+    if index > 4:
         break

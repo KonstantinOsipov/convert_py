@@ -139,15 +139,11 @@ for index, row in result_2.iterrows():
                     "step": data_json["Numeric"],
                     "timestamp": (data_json["date/time string"])[0:11],
                     "Ratio": data_full_tr.loc['Ratio',i[1]],
-                        "pulses": [{'pulse':0,
-                                    "amplitude_reper": data_full_tr.loc['A_Reper',i[1]],
-                                    "amplitude_analyt": data_full_tr.loc['A_Analyt',i[1]],
-                                    'pulses':
-                                    {'impulse_reper': data_json["0-Rep;1-Sig"][0],
-                                     'impulse_analyt': data_json["0-Rep;1-Sig"][1]
-                                    }
-                                }
-                                ]
+                    "av_pulses": {'impulse_reper': data_json["0-Rep;1-Sig"][0],
+                                'impulse_analyt': data_json["0-Rep;1-Sig"][1]},
+                    "av_analyt_amp": data_full_tr.loc['A_Analyt',i[1]],
+                    "av_reper_amp": data_full_tr.loc['A_Reper',i[1]],
+                    "pulses": []
                     #Данные с сигналами убраны из структуры json. Надо воткнуть smoothed обратно.                 
                     }
             #Записываем данные в таблицу measurements
@@ -184,7 +180,7 @@ for index, row in result_2.iterrows():
     #   file.write(json_data)
         json.dump(my_measurement, file)
     print('Записан файл...' + output_filename)
-    if index == 2:
+    if index == 4:
         break
 cur.close()
 conn.close()
