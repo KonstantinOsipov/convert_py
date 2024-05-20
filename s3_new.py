@@ -7,8 +7,10 @@ from datetime import datetime
 
 #######
 #что хотелось бы добавить:
-#1. Уменьшить количество цифр после запятой в 2 раза
+#1. Уменьшить количество цифр после запятой в 2 раза - НЕТ смысла делать это, там и так чисел мало.
 #2. Проредить импульсы для регистрации БД. Записывать каждый 3-й импульс
+#3. Так а можно же усредненные данные из файла записывать. + Импульсы средние добавить.
+
 
 try:
     # пытаемся подключиться к базе данных
@@ -63,11 +65,11 @@ def raw_file(element):
             df_impulse = df_step[df_step['Impulse'] == impulse_value]
             pulses_dict={"pulse": impulse_value,
                         "pulses": {
-                            "impulse_reper": [format(num, '.6e') for num in df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist()],
-                            "impulse_analyt": [format(num, '.6e') for num in df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist()],
+                            "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
+                            "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
                         },
-                        "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],6),
-                        "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],6)
+                        "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],8),
+                        "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],8)
                         }
             output_dict['pulses'].append(pulses_dict)
         final_output[str(f"step_{step_value}")] = output_dict #Вот из этого объекта легко получим все данные.
@@ -120,6 +122,9 @@ for index, value in enumerate(files_dict.values()):
     inserted_record = cur.fetchone()
     exp_id = inserted_record[0]
     conn.commit()
+    #Получаем средние значения из файла value[0]
+    data_full = pd.read_csv(os.path.join(source_folder, value[0]), delimiter='\t', header=None)
+    data_full.columns = ['step_time', 'Step', 'A_Reper', 'A_Analyt', 'Ratio']
 
     #Дальше нужно записывать шаги и импульсы на них. Информация о времени измерения и шаге находится в элементе value[0] нашего объекта с экспериментом
     #Все же давайте начнем с чтения большого файла value[2]. Читаем объект из value[2]
@@ -131,8 +136,16 @@ for index, value in enumerate(files_dict.values()):
     exp_id = exp_id
     steps = []
     for idx, step in step_data.iterrows():
+        object = data_impulse.iloc[0,idx[1]] #Завтра проверить отсюда
+        try:
+            data_json = json.loads(object)
+            print(data_json["0-Rep;1-Sig"][0])
+        except TypeError:
+            pass
         step_0 = {"step": idx,
                   "timestamp": step['step_time'],
+                  "av_analyt_amp": data_full.loc[idx]['A_Analyt'],
+                  "av_reper_amp": data_full.loc[idx]['A_Reper'],
                   "pulses": []
                   }
         start_time = step['step_time']
@@ -159,14 +172,14 @@ for index, value in enumerate(files_dict.values()):
                 j['amplitude_reper'], 
                 )
             tuple_data.append(data)
-            # if i > 10:
-            #     break
-        print(f'Размер tuple data = _{len(tuple_data)}')
+            if i > 5:
+                break
+#       print(f'Размер tuple data = _{len(tuple_data)}')
         steps.append(step_0)
 #       insert_query = "INSERT INTO pulses (step_id, reper_amp, analyt_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
 #       cur.executemany(insert_query, tuple_data)
 #       conn.commit()
-        if idx == 40:
+        if idx == 5:
             break
     #Данные в JSON файл: 
     my_measurement = {
@@ -181,5 +194,5 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 5:
+    if index > 3:
         break
