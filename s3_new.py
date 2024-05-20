@@ -5,6 +5,11 @@ import json
 import psycopg2
 from datetime import datetime
 
+#######
+#что хотелось бы добавить:
+#1. Уменьшить количество цифр после запятой в 2 раза
+#2. Проредить импульсы для регистрации БД. Записывать каждый 3-й импульс
+
 try:
     # пытаемся подключиться к базе данных
     conn = psycopg2.connect("dbname=experiments user=kokos password=jumbo host=92.118.115.115 port=5531")
@@ -45,7 +50,6 @@ def raw_file(element):
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
     impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
     impulses['Sum'] = impulses.iloc[:,8:63].sum(axis=1)
-    print(impulses.head(3))
     unique_steps = impulses['Step'].unique()
     # Initialize the final output dictionary
     final_output = {}
@@ -59,11 +63,11 @@ def raw_file(element):
             df_impulse = df_step[df_step['Impulse'] == impulse_value]
             pulses_dict={"pulse": impulse_value,
                         "pulses": {
-                            "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
-                            "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
+                            "impulse_reper": [format(num, '.6e') for num in df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist()],
+                            "impulse_analyt": [format(num, '.6e') for num in df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist()],
                         },
-                        "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],4),
-                        "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],4)
+                        "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],6),
+                        "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],6)
                         }
             output_dict['pulses'].append(pulses_dict)
         final_output[str(f"step_{step_value}")] = output_dict #Вот из этого объекта легко получим все данные.
@@ -162,7 +166,7 @@ for index, value in enumerate(files_dict.values()):
 #       insert_query = "INSERT INTO pulses (step_id, reper_amp, analyt_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
 #       cur.executemany(insert_query, tuple_data)
 #       conn.commit()
-        if idx == 20:
+        if idx == 40:
             break
     #Данные в JSON файл: 
     my_measurement = {
@@ -177,5 +181,5 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 4:
+    if index > 5:
         break
