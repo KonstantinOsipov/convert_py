@@ -8,8 +8,8 @@ from datetime import datetime
 #######
 #что хотелось бы добавить:
 #1. Уменьшить количество цифр после запятой в 2 раза - НЕТ смысла делать это, там и так чисел мало.
-#2. Проредить импульсы для регистрации БД. Записывать каждый 3-й импульс
-#3. Так а можно же усредненные данные из файла записывать. + Импульсы средние добавить.
+#2. Проредить импульсы для регистрации БД. Записывать каждый 3-й импульс. Вместо 600 оставить 200.
+#3. Так а можно же усредненные данные из файла записывать. + Импульсы средние добавить. DONE.
 
 
 try:
@@ -136,14 +136,12 @@ for index, value in enumerate(files_dict.values()):
     exp_id = exp_id
     steps = []
     for idx, step in step_data.iterrows():
-        object = data_impulse.iloc[0,idx[1]] #Завтра проверить отсюда
-        try:
-            data_json = json.loads(object)
-            print(data_json["0-Rep;1-Sig"][0])
-        except TypeError:
-            pass
-        step_0 = {"step": idx,
+        object = data_impulse.iloc[0,[idx][0]]
+        data_json = json.loads(object)
+        step_0 = {"step": data_json["Numeric"],
                   "timestamp": step['step_time'],
+                  "av_pulses": {'impulse_reper': [format(num, '.5e') for num in data_json["0-Rep;1-Sig"][0] ],
+                                'impulse_analyt': [format(num, '.5e') for num in data_json["0-Rep;1-Sig"][1] ]},
                   "av_analyt_amp": data_full.loc[idx]['A_Analyt'],
                   "av_reper_amp": data_full.loc[idx]['A_Reper'],
                   "pulses": []
@@ -172,15 +170,15 @@ for index, value in enumerate(files_dict.values()):
                 j['amplitude_reper'], 
                 )
             tuple_data.append(data)
-            if i > 5:
-                break
+            # if i > 20:
+            #     break
 #       print(f'Размер tuple data = _{len(tuple_data)}')
         steps.append(step_0)
 #       insert_query = "INSERT INTO pulses (step_id, reper_amp, analyt_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
 #       cur.executemany(insert_query, tuple_data)
 #       conn.commit()
-        if idx == 5:
-            break
+        # if idx == 5:
+        #     break
     #Данные в JSON файл: 
     my_measurement = {
         'slide': slide,
@@ -194,5 +192,5 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 3:
+    if index > 5:
         break
