@@ -74,6 +74,13 @@ def raw_file(element):
             output_dict['pulses'].append(pulses_dict)
         final_output[str(f"step_{step_value}")] = output_dict #Вот из этого объекта легко получим все данные.
     return final_output
+def extract_substance_name(row):
+    start_index = row.find('data_') + len('data_')
+    end_index = row.find('_', start_index)
+    if start_index != -1 and end_index != -1:
+        return row[start_index:end_index]
+    else:
+        return "Название не найдено"
 #Дальше идем по объектам, считываем эти файлы, и записываем в БД. Нужно добавить создание JSON файлы для каждого эксперимента.
 for index, value in enumerate(files_dict.values()):
     data_impulse = pd.read_csv(os.path.join(source_folder, value[1]), delimiter='\t', header=None)
@@ -116,8 +123,9 @@ for index, value in enumerate(files_dict.values()):
     calc_id = calc_id
     start_time = datetime.strptime(value[0][-21:-4], "%d.%m.%y-%H.%M.%S")
     description = value[0][5:-22]
-    insert_query = "INSERT INTO  experiment (start_time, description, calc_id) VALUES (%s, %s, %s) RETURNING id"
-    data = (start_time, description, calc_id)
+    substance = extract_substance_name(value[0])
+    insert_query = "INSERT INTO experiment (start_time, description, substance, calc_id) VALUES (%s, %s, %s, %s) RETURNING id"
+    data = (start_time, description, substance, calc_id)
     cur.execute(insert_query, data)
     inserted_record = cur.fetchone()
     exp_id = inserted_record[0]
@@ -154,6 +162,7 @@ for index, value in enumerate(files_dict.values()):
         cur.execute(insert_query, data)
         inserted_record = cur.fetchone()
         step_id = inserted_record[0]
+        conn.commit()
         impulse_object = raw_object[raw_object_keys[idx]]
         tuple_data=[] #Сделать еще одну структуру словарь для записи JSON 
         for i, j in enumerate(impulse_object['pulses']):
@@ -169,7 +178,7 @@ for index, value in enumerate(files_dict.values()):
                 j['amplitude_analyt'], 
                 j['amplitude_reper'], 
                 )
-            tuple_data.append(data)
+            # tuple_data.append(data)
             # if i > 20:
             #     break
 #       print(f'Размер tuple data = _{len(tuple_data)}')
@@ -192,5 +201,7 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 5:
+    if index > 8:
         break
+cur.close()
+conn.close()

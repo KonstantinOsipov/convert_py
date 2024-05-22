@@ -5,6 +5,7 @@ import re
 import json
 import shutil
 import psycopg2
+import time
 from datetime import datetime
 #Внимание! 01.05.2024 Поменял структуру БД. Эти файлы должны записываться в новую структуру. И по файлам JSON получается
 #Открываем папку. Считываем все .dat. И складываем в DataFrame
@@ -39,10 +40,21 @@ for file in files:
     else:
         full_df = full_df._append({'FileName': file, 'datetime': file[len(file)-18:len(file)-4] } ,ignore_index=True)
 result = pd.merge(impulse_df, full_df, on='datetime')
+
+def extract_substance_name(row):
+    start_index = row.find('FULL_') + len('FULL_')
+    end_index = row.find('_', start_index)
+    if start_index != -1 and end_index != -1:
+        return row[start_index:end_index]
+    else:
+        return "Название не найдено"
+
 result_2 = pd.DataFrame({
     'Impulse': result['FileName_x'],
     'FULL': result['FileName_y']
 })
+
+result_2['Substance'] = result_2['FULL'].apply(extract_substance_name)
 
 def find_last_index(text):
     start = text.find('Impulse_')
@@ -89,6 +101,7 @@ for index, row in result_2.iterrows():
     delay_pts = 5
     pulse_width_pts = 60
     end_offset_pts = 400
+    
     # Тут добавляется запись в таблицу calculations. SQL-запрос для проверки наличия записи
     check_query = "SELECT id FROM calculations WHERE slide = %s AND accum_pulses = %s AND delay_pts = %s AND pulse_width_pts = %s AND end_offset_pts = %s"
     # Значение для проверки
@@ -109,7 +122,7 @@ for index, row in result_2.iterrows():
         calc_id = inserted_record[0]
     # Подтверждение изменений и закрытие соединения
     conn.commit()
-        
+
     link_str = row['FULL']
     Reper_link = link_str.replace('FULL', 'Reper')
     Analyt_link = link_str.replace('FULL', 'Analyt')
@@ -118,58 +131,66 @@ for index, row in result_2.iterrows():
     #Пишем в таблицу "experiment"
     start_time = datetime.strptime(find_last_index(row['Impulse'])[1], "%m.%d.%Y_%H.%M.%S")
     description = (row['Impulse'])[13:-19]
+    substance = row['Substance']
     calc_id = calc_id
     reper_file_link = reper_file
     analyt_file_link = analyt_file
-    insert_query = "INSERT INTO  experiment (start_time, description, calc_id, reper_file_link, analyt_file_link) VALUES (%s, %s, %s, %s, %s) RETURNING id"
-    data = (start_time, description, calc_id, reper_file_link, analyt_file_link)
+    insert_query = "INSERT INTO  experiment (start_time, description, substance, calc_id, reper_file_link, analyt_file_link) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
+    data = (start_time, description, substance, calc_id, reper_file_link, analyt_file_link)
     cur.execute(insert_query, data)
     inserted_record = cur.fetchone()
     exp_id = inserted_record[0]
     conn.commit()
-    
+    delay_pulses = 200
     steps = []
     df_reper = pd.DataFrame()
     df_analyt = pd.DataFrame()
+    begin_time = time.time()
+    tuple_data=[] #Сделать еще одну структуру массив для записи в БД executemany
     for i in zip(data_impulse, data_full_tr):
         object = data_impulse.iloc[0,i[1]]
         try:
             data_json = json.loads(object)
+            av_pulses = {'impulse_reper': [format(num, '.5e') for num in data_json["0-Rep;1-Sig"][0] ],
+                        'impulse_analyt': [format(num, '.5e') for num in data_json["0-Rep;1-Sig"][1] ]},
             step = {
                     "step": data_json["Numeric"],
                     "timestamp": (data_json["date/time string"])[0:11],
                     "Ratio": data_full_tr.loc['Ratio',i[1]],
-                    "av_pulses": {'impulse_reper': data_json["0-Rep;1-Sig"][0],
-                                'impulse_analyt': data_json["0-Rep;1-Sig"][1]},
+                    "av_pulses": av_pulses[0],
                     "av_analyt_amp": data_full_tr.loc['A_Analyt',i[1]],
                     "av_reper_amp": data_full_tr.loc['A_Reper',i[1]],
                     "pulses": []
                     #Данные с сигналами убраны из структуры json. Надо воткнуть smoothed обратно.                 
                     }
             #Записываем данные в таблицу measurements
-            delay_pulses = 200
-            insert_query = "INSERT INTO steps (exp_id, start_time, step, delay_pulses) VALUES (%s, %s, %s, %s)"
             data = (
                 exp_id,
                 (data_json["date/time string"])[0:11].replace(",", "."),
                 data_json["Numeric"], # это шаг. 
-                delay_pulses
-                # data_full_tr.loc['A_Reper',i[1]].replace(",", "."),
-                # data_full_tr.loc['A_Analyt',i[1]].replace(",", "."),
-                # data_full_tr.loc['Ratio',i[1]].replace(",", ".")
-            )
-            cur.execute(insert_query, data)
-            conn.commit() #закомментирую пока, не знаю что это
+                delay_pulses,
+                json.dumps(av_pulses[0]),
+                data_full_tr.loc['A_Analyt',i[1]].replace(",", "."),
+                data_full_tr.loc['A_Reper',i[1]].replace(",", ".")
+                )
+            tuple_data.append(data)
 #           df_reper[step['step']] = data_json["0-Rep;1-Sig"][0]
 #           df_analyt[step['step']] = data_json["0-Rep;1-Sig"][1]
             steps.append(step)
         except TypeError:
             pass
+    insert_query = "INSERT INTO steps (exp_id, start_time, step, delay_pulses, av_pulses, av_analyt_amp, av_reper_amp) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+    cur.executemany(insert_query, tuple_data)
+    conn.commit()
+    end_time = time.time()
+    execution_time = end_time - begin_time
+    print("Время выполнения операции: {:.5f} секунд".format(execution_time))
     output_filename = os.path.join(output_folder, row['Impulse'][13:-4] + ".json")
     my_measurement = {
         'slide': slide,
         'accum_pulses': accum,
         'comment': find_last_index(row['Impulse'])[0],
+        'substance': substance,
         'timestamp': find_last_index(row['Impulse'])[1],
         'Reper_link': Reper_link,
         'Analyt_link': Analyt_link,
@@ -180,7 +201,7 @@ for index, row in result_2.iterrows():
     #   file.write(json_data)
         json.dump(my_measurement, file)
     print('Записан файл...' + output_filename)
-    if index == 4:
-        break
+    # if index >= 5:
+    #     break
 cur.close()
 conn.close()
