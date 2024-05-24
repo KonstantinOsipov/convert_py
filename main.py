@@ -64,6 +64,11 @@ def find_last_index(text):
     timestamp = date_parts[0] + ".2023_" + date_parts[1]
     return text[end:len(text)-4], timestamp
 
+def convert_to_float(obj):
+    if isinstance(obj, list):
+        return [float(format(num, '.5e')) for num in obj]
+    return obj
+
 try:
     # пытаемся подключиться к базе данных
     conn = psycopg2.connect("dbname=experiments user=kokos password=jumbo host=92.118.115.115 port=5531")
@@ -151,15 +156,15 @@ for index, row in result_2.iterrows():
         object = data_impulse.iloc[0,i[1]]
         try:
             data_json = json.loads(object)
-            av_pulses = {'impulse_reper': [format(num, '.5e') for num in data_json["0-Rep;1-Sig"][0] ],
-                        'impulse_analyt': [format(num, '.5e') for num in data_json["0-Rep;1-Sig"][1] ]},
+            av_pulses = {'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
+                        'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]},
             step = {
                     "step": data_json["Numeric"],
                     "timestamp": (data_json["date/time string"])[0:11],
-                    "Ratio": data_full_tr.loc['Ratio',i[1]],
+                    "Ratio": float(data_full_tr.loc['Ratio',i[1]].replace(",", ".")),
                     "av_pulses": av_pulses[0],
-                    "av_analyt_amp": data_full_tr.loc['A_Analyt',i[1]],
-                    "av_reper_amp": data_full_tr.loc['A_Reper',i[1]],
+                    "av_analyt_amp": float(data_full_tr.loc['A_Analyt',i[1]].replace(",", ".")),
+                    "av_reper_amp": float(data_full_tr.loc['A_Reper',i[1]].replace(",", ".")),
                     "pulses": []
                     #Данные с сигналами убраны из структуры json. Надо воткнуть smoothed обратно.                 
                     }
@@ -179,6 +184,7 @@ for index, row in result_2.iterrows():
             steps.append(step)
         except TypeError:
             pass
+            )
     insert_query = "INSERT INTO steps (exp_id, start_time, step, delay_pulses, av_pulses, av_analyt_amp, av_reper_amp) VALUES (%s, %s, %s, %s, %s, %s, %s)"
     cur.executemany(insert_query, tuple_data)
     conn.commit()
