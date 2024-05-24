@@ -10,6 +10,7 @@ from datetime import datetime
 #1. Уменьшить количество цифр после запятой в 2 раза - НЕТ смысла делать это, там и так чисел мало.
 #2. Проредить импульсы для регистрации БД. Записывать каждый 3-й импульс. Вместо 600 оставить 200.
 #3. Так а можно же усредненные данные из файла записывать. + Импульсы средние добавить. DONE.
+# Удялять бы из таблиц experiment и step все записи, кроме 2023 года.
 
 
 try:
@@ -23,11 +24,21 @@ except:
 # получение объекта курсора
 cur = conn.cursor()
 
-#Открываем SQL-скрипта для удаления и создания таблиц. Не будем делать этого.
+#Открываем SQL-скрипта для удаления и создания таблиц. Ничего не удаляем.
 # with open('create_tables_script_31.12.sql', 'r') as file:
 #     script = file.read()
 # cur.execute(script)
 # conn.commit()
+
+last_exp_id = 450
+# Удаление записей из таблицы "steps" по заданному условию
+cur.execute("DELETE FROM steps WHERE exp_id > %s", (last_exp_id,))
+
+# Удаление записей из таблицы "experiment" по заданному условию
+cur.execute("DELETE FROM experiment WHERE id > %s", (last_exp_id,))
+
+# Подтверждение изменений и закрытие соединения
+conn.commit()
 
 #Через S3 не получается. Все равно нужно копировать файлы чтоыб их распаковать
 #Указываем папку с файлами. Считываем все *.dat . И складываем в DataFrame
@@ -148,8 +159,8 @@ for index, value in enumerate(files_dict.values()):
         data_json = json.loads(object)
         step_0 = {"step": data_json["Numeric"],
                   "timestamp": step['step_time'],
-                  "av_pulses": {'impulse_reper': [format(num, '.5e') for num in data_json["0-Rep;1-Sig"][0] ],
-                                'impulse_analyt': [format(num, '.5e') for num in data_json["0-Rep;1-Sig"][1] ]},
+                  "av_pulses": {'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
+                                'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]},
                   "av_analyt_amp": data_full.loc[idx]['A_Analyt'],
                   "av_reper_amp": data_full.loc[idx]['A_Reper'],
                   "pulses": []
@@ -157,14 +168,18 @@ for index, value in enumerate(files_dict.values()):
         start_time = step['step_time']
         step = step['Step'] # Тут по хорошему надо будет сделать И номер И позицию.
         delay_pulses = 200
-        insert_query = "INSERT INTO steps (start_time, step, delay_pulses, exp_id) VALUES (%s, %s, %s, %s) RETURNING id"
-        data = (start_time, step, delay_pulses, exp_id)
-        cur.execute(insert_query, data)
+        insert_query = "INSERT INTO steps (start_time, step, delay_pulses, exp_id, av_analyt_amp, av_reper_amp) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
+        averaged = (start_time, step, delay_pulses, exp_id,
+                data_full.loc[idx]['A_Analyt'],
+                data_full.loc[idx]['A_Reper']
+                )
+        cur.execute(insert_query, averaged)
         inserted_record = cur.fetchone()
         step_id = inserted_record[0]
         conn.commit()
+        print(f'Записали шаг {data_json["Numeric"]}, прошло времени...')
         impulse_object = raw_object[raw_object_keys[idx]]
-        tuple_data=[] #Сделать еще одну структуру словарь для записи JSON 
+        tuple_data=[] #Сделать еще одну структуру словарь для записи JSON
         for i, j in enumerate(impulse_object['pulses']):
             data_dict = {"pulse": i,
                         "pulses": j['pulses'],
@@ -174,18 +189,17 @@ for index, value in enumerate(files_dict.values()):
             step_0["pulses"].append(data_dict)
             data = (
                 step_id,
-                json.dumps(j['pulses']),
+#               [], # #Тут были массивы json.dumps(j['pulses']), но очень долго записывается в базу
                 j['amplitude_analyt'], 
                 j['amplitude_reper'], 
                 )
-            # tuple_data.append(data)
+            tuple_data.append(data)
             # if i > 20:
             #     break
-#       print(f'Размер tuple data = _{len(tuple_data)}')
-        steps.append(step_0)
-#       insert_query = "INSERT INTO pulses (step_id, reper_amp, analyt_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
-#       cur.executemany(insert_query, tuple_data)
-#       conn.commit()
+        steps.append(step_0) # Есть ошибка, нужно номер импульса добавить для записи в БД. таблица pulses.
+        insert_query = "INSERT INTO pulses (step_id, analyt_amp, reper_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
+        cur.executemany(insert_query, tuple_data)
+        conn.commit()
         # if idx == 5:
         #     break
     #Данные в JSON файл: 
@@ -201,7 +215,7 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 8:
+    if index > 1:
         break
 cur.close()
 conn.close()

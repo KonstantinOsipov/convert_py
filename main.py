@@ -64,11 +64,6 @@ def find_last_index(text):
     timestamp = date_parts[0] + ".2023_" + date_parts[1]
     return text[end:len(text)-4], timestamp
 
-def convert_to_float(obj):
-    if isinstance(obj, list):
-        return [float(format(num, '.5e')) for num in obj]
-    return obj
-
 try:
     # пытаемся подключиться к базе данных
     conn = psycopg2.connect("dbname=experiments user=kokos password=jumbo host=92.118.115.115 port=5531")
@@ -184,7 +179,6 @@ for index, row in result_2.iterrows():
             steps.append(step)
         except TypeError:
             pass
-            )
     insert_query = "INSERT INTO steps (exp_id, start_time, step, delay_pulses, av_pulses, av_analyt_amp, av_reper_amp) VALUES (%s, %s, %s, %s, %s, %s, %s)"
     cur.executemany(insert_query, tuple_data)
     conn.commit()
