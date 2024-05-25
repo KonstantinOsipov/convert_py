@@ -97,6 +97,7 @@ END $$;
 -- Создание таблицы
 CREATE TABLE pulses (
     id SERIAL PRIMARY KEY,
+    pulse_number INT,
 	step_id INTEGER REFERENCES steps(id),
 	pulses JSONB,
     analyt_amp FLOAT,

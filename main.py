@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 #Внимание! 01.05.2024 Поменял структуру БД. Эти файлы должны записываться в новую структуру. И по файлам JSON получается
 #Открываем папку. Считываем все .dat. И складываем в DataFrame
+#Блин, забыл номер импульса добавить в таблицу pulses. Но здесь он и не нужен.
 source_folder = 'd:/Work/2023/TimeWeb_data/'
 files = os.listdir(source_folder)
 files = [file for file in files if file.endswith(".dat")]

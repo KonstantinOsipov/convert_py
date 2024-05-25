@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import json
 import psycopg2
+import time
 from datetime import datetime
 
 #######
@@ -31,6 +32,8 @@ cur = conn.cursor()
 # conn.commit()
 
 last_exp_id = 450
+# Удаление ВСЕХ записей из таблицы "steps" по заданному условию
+cur.execute("DELETE FROM pulses")
 # Удаление записей из таблицы "steps" по заданному условию
 cur.execute("DELETE FROM steps WHERE exp_id > %s", (last_exp_id,))
 
@@ -155,6 +158,7 @@ for index, value in enumerate(files_dict.values()):
     exp_id = exp_id
     steps = []
     for idx, step in step_data.iterrows():
+        begin_time = time.time()
         object = data_impulse.iloc[0,[idx][0]]
         data_json = json.loads(object)
         step_0 = {"step": data_json["Numeric"],
@@ -177,10 +181,13 @@ for index, value in enumerate(files_dict.values()):
         inserted_record = cur.fetchone()
         step_id = inserted_record[0]
         conn.commit()
-        print(f'Записали шаг {data_json["Numeric"]}, прошло времени...')
+        end_time = time.time()
+        execution_time = end_time - begin_time
+        print(f'Записали шаг {data_json["Numeric"]}, эксперимента {value[0]} прошло времени...{execution_time:.5f} секунд')
         impulse_object = raw_object[raw_object_keys[idx]]
         tuple_data=[] #Сделать еще одну структуру словарь для записи JSON
         for i, j in enumerate(impulse_object['pulses']):
+            pulse_number = i
             data_dict = {"pulse": i,
                         "pulses": j['pulses'],
                         "amplitude_reper": j['amplitude_reper'],
@@ -189,6 +196,7 @@ for index, value in enumerate(files_dict.values()):
             step_0["pulses"].append(data_dict)
             data = (
                 step_id,
+                pulse_number,
 #               [], # #Тут были массивы json.dumps(j['pulses']), но очень долго записывается в базу
                 j['amplitude_analyt'], 
                 j['amplitude_reper'], 
@@ -197,7 +205,7 @@ for index, value in enumerate(files_dict.values()):
             # if i > 20:
             #     break
         steps.append(step_0) # Есть ошибка, нужно номер импульса добавить для записи в БД. таблица pulses.
-        insert_query = "INSERT INTO pulses (step_id, analyt_amp, reper_amp) VALUES (%s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
+        insert_query = "INSERT INTO pulses (step_id, pulse_number, analyt_amp, reper_amp) VALUES (%s, %s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
         cur.executemany(insert_query, tuple_data)
         conn.commit()
         # if idx == 5:
