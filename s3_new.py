@@ -16,7 +16,7 @@ from datetime import datetime
 
 try:
     # пытаемся подключиться к базе данных
-    conn = psycopg2.connect("dbname=experiments user=kokos password=jumbo host=92.118.115.115 port=5531")
+    conn = psycopg2.connect("dbname=experiments user=kokos password=jumbo host=127.0.0.1 port=5531")
     print('Соединение установлено...!')
 except:
     # в случае сбоя подключения
@@ -61,7 +61,7 @@ for index, file_name in enumerate(files):
         files_dict[date] = [file_name]
 print(f'Число объектов, {len(files_dict)}'
       )
-def raw_file(element):
+def raw_file(element, get_every_pulse):
     impulses = pd.read_csv(os.path.join(source_folder, value[element]), delimiter=',', header=None)
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
     impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
@@ -77,15 +77,16 @@ def raw_file(element):
         }
         for impulse_value in df_step['Impulse'].unique():
             df_impulse = df_step[df_step['Impulse'] == impulse_value]
-            pulses_dict={"pulse": impulse_value,
-                        "pulses": {
-                            "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
-                            "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
-                        },
-                        "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],8),
-                        "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],8)
-                        }
-            output_dict['pulses'].append(pulses_dict)
+            if impulse_value % get_every_pulse == 0:
+                pulses_dict={"pulse": impulse_value,
+                            "pulses": {
+                                "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
+                                "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
+                            },
+                            "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],8),
+                            "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],8)
+                            }
+                output_dict['pulses'].append(pulses_dict)
         final_output[str(f"step_{step_value}")] = output_dict #Вот из этого объекта легко получим все данные.
     return final_output
 def extract_substance_name(row):
@@ -150,7 +151,7 @@ for index, value in enumerate(files_dict.values()):
 
     #Дальше нужно записывать шаги и импульсы на них. Информация о времени измерения и шаге находится в элементе value[0] нашего объекта с экспериментом
     #Все же давайте начнем с чтения большого файла value[2]. Читаем объект из value[2]
-    raw_object = raw_file(2)
+    raw_object = raw_file(2,2)
     raw_object_keys = list(raw_object.keys())
 
     step_data = pd.read_csv(os.path.join(source_folder, value[0]), delimiter='\t', header=None)
@@ -187,8 +188,8 @@ for index, value in enumerate(files_dict.values()):
         impulse_object = raw_object[raw_object_keys[idx]]
         tuple_data=[] #Сделать еще одну структуру словарь для записи JSON
         for i, j in enumerate(impulse_object['pulses']):
-            pulse_number = i
-            data_dict = {"pulse": i,
+            pulse_number = j['pulse']
+            data_dict = {"pulse": pulse_number,
                         "pulses": j['pulses'],
                         "amplitude_reper": j['amplitude_reper'],
                         "amplitude_analyt": j['amplitude_analyt']
@@ -212,6 +213,7 @@ for index, value in enumerate(files_dict.values()):
         #     break
     #Данные в JSON файл: 
     my_measurement = {
+        'dataset': 'Dataset1',
         'slide': slide,
         'accum_pulses': accum,
         'comment': description,
@@ -223,7 +225,7 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 1:
+    if index > 2:
         break
 cur.close()
 conn.close()

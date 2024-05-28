@@ -67,7 +67,7 @@ def find_last_index(text):
 
 try:
     # пытаемся подключиться к базе данных
-    conn = psycopg2.connect("dbname=experiments user=kokos password=jumbo host=92.118.115.115 port=5531")
+    conn = psycopg2.connect("dbname=experiments user=kokos password=jumbo host=127.0.0.1 port=5531")
     print('Соединение установлено...!')
 except:
     # в случае сбоя подключения
@@ -157,7 +157,6 @@ for index, row in result_2.iterrows():
             step = {
                     "step": data_json["Numeric"],
                     "timestamp": (data_json["date/time string"])[0:11],
-                    "Ratio": float(data_full_tr.loc['Ratio',i[1]].replace(",", ".")),
                     "av_pulses": av_pulses[0],
                     "av_analyt_amp": float(data_full_tr.loc['A_Analyt',i[1]].replace(",", ".")),
                     "av_reper_amp": float(data_full_tr.loc['A_Reper',i[1]].replace(",", ".")),
@@ -188,13 +187,12 @@ for index, row in result_2.iterrows():
     print("Время выполнения операции: {:.5f} секунд".format(execution_time))
     output_filename = os.path.join(output_folder, row['Impulse'][13:-4] + ".json")
     my_measurement = {
+        'dataset': 'Dataset0',
         'slide': slide,
         'accum_pulses': accum,
         'comment': find_last_index(row['Impulse'])[0],
         'substance': substance,
         'timestamp': find_last_index(row['Impulse'])[1],
-        'Reper_link': Reper_link,
-        'Analyt_link': Analyt_link,
         'steps': steps}
     #json_data = json.dumps(my_measurement, separators=(',', ':'))
     # Записываем JSON
@@ -202,7 +200,7 @@ for index, row in result_2.iterrows():
     #   file.write(json_data)
         json.dump(my_measurement, file)
     print('Записан файл...' + output_filename)
-    # if index >= 5:
-    #     break
+    if index >= 3:
+        break
 cur.close()
 conn.close()
