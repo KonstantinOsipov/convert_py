@@ -200,7 +200,7 @@ for index, row in result_2.iterrows():
     #   file.write(json_data)
         json.dump(my_measurement, file)
     print('Записан файл...' + output_filename)
-    if index >= 3:
+    if index >= 2:
         break
 cur.close()
 conn.close()

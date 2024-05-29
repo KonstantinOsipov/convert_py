@@ -217,6 +217,7 @@ for index, value in enumerate(files_dict.values()):
         'slide': slide,
         'accum_pulses': accum,
         'comment': description,
+        'substance': substance,
         'timestamp': value[0][-21:-4],
         'steps': steps}
     with open(output_filename, 'w') as file:
