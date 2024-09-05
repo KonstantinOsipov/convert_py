@@ -5,6 +5,7 @@ import json
 import psycopg2
 import time
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 #######
 #что хотелось бы добавить:
@@ -67,7 +68,7 @@ def raw_file(element, get_every_pulse):
     impulses = pd.read_csv(os.path.join(source_folder, value[element]), delimiter=',', header=None)
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
     impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
-    impulses['Sum'] = impulses.iloc[:,8:63].sum(axis=1)
+    impulses['Sum'] = impulses.iloc[:,8:63].mean(axis=1)
     unique_steps = impulses['Step'].unique()
     # Initialize the final output dictionary
     final_output = {}
@@ -196,6 +197,24 @@ for index, value in enumerate(files_dict.values()):
                         "amplitude_reper": j['amplitude_reper'],
                         "amplitude_analyt": j['amplitude_analyt']
                   }
+            # Извлечение данных из JSON-объекта
+            impulse_reper = j['pulses']['impulse_reper']
+            impulse_analyt = j['pulses']['impulse_analyt']
+            amp_reper = j['amplitude_reper']
+            amp_analyt = j['amplitude_analyt']
+            # Построение графика
+            plt.plot(impulse_reper, label='Impulse Reper')
+            plt.plot(impulse_analyt, label='Impulse Analyt')
+            plt.xlabel('X-axis')
+            plt.ylabel('Y-axis')
+            plt.title('График двух массивов данных')
+            plt.legend()
+            # Отображение амплитуд
+            plt.text(s=f'Средняя амплитуда импульса Reper: {amp_reper}', y=0.7, x=110)
+            plt.text(s=f'Средняя амплитуда импульса Analyt: {amp_analyt}', y=0.5, x=110)
+            # plt.text(len(impulse_reper)-1, amp_reper, f'Amplitude Reper: {amp_reper}', va='bottom')
+            # plt.text(len(impulse_analyt)-1, amp_analyt, f'Amplitude Analyt: {amp_analyt}', va='bottom')
+            plt.show()
             step_0["pulses"].append(data_dict)
             data = (
                 step_id,
@@ -205,14 +224,14 @@ for index, value in enumerate(files_dict.values()):
                 j['amplitude_reper'], 
                 )
             tuple_data.append(data)
-            # if i > 20:
-            #     break
+            if i > 30:
+                break
         steps.append(step_0) # Есть ошибка, нужно номер импульса добавить для записи в БД. таблица pulses.
-        insert_query = "INSERT INTO pulses (step_id, pulse_number, analyt_amp, reper_amp) VALUES (%s, %s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
-        cur.executemany(insert_query, tuple_data)
-        conn.commit()
-        # if idx == 5:
-        #     break
+        # insert_query = "INSERT INTO pulses (step_id, pulse_number, analyt_amp, reper_amp) VALUES (%s, %s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
+        # cur.executemany(insert_query, tuple_data)
+        # conn.commit()
+        if idx == 3:
+            break
     #Данные в JSON файл: 
     my_measurement = {
         'dataset': 'Dataset1',
