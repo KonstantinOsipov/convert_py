@@ -64,11 +64,12 @@ for index, file_name in enumerate(files):
         files_dict[date] = [file_name]
 print(f'Число объектов, {len(files_dict)}'
       )
-def raw_file(element, get_every_pulse):
+def raw_file(element, get_every_pulse): #Параметр get_every_pulse нужен для того, чтобы прореживать импульсы. В данном случае мы берем каждый второй импульс
     impulses = pd.read_csv(os.path.join(source_folder, value[element]), delimiter=',', header=None)
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
     impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
-    impulses['Sum'] = impulses.iloc[:,8:63].sum(axis=1)
+    impulses['Threshold'] = impulses.iloc[:,len(impulses.columns)-100:len(impulses.columns)].mean(axis=1)
+    impulses['Sum'] = impulses.iloc[:,8:63].sum(axis=1) - impulses['Threshold']
     unique_steps = impulses['Step'].unique()
     # Initialize the final output dictionary
     final_output = {}
@@ -82,10 +83,10 @@ def raw_file(element, get_every_pulse):
             df_impulse = df_step[df_step['Impulse'] == impulse_value]
             if impulse_value % get_every_pulse == 0:
                 pulses_dict={"pulse": impulse_value,
-                            "pulses": {
-                                "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
-                                "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
-                            },
+                            # "pulses": { Объект с импульсами не нужен, не буедм его считывать. Это ускорит дело.
+                            #     "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
+                            #     "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
+                            # },
                             "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],8),
                             "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],8)
                             }
@@ -233,7 +234,7 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 3:
+    if index > 5:
         break
 cur.close()
 conn.close()
