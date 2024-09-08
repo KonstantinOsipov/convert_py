@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 #3. Так а можно же усредненные данные из файла записывать. + Импульсы средние добавить. DONE.
 #4. Удялять бы из таблиц experiment и step все записи, кроме 2023 года.
 #5. 03.09.2024 Пока непонятно как дальше быть. Не охота пихать все импульсы в БД. Пусть лежат в S3 хранилище, и будет ссылка на них.
-#6. Также хочется вывести график с формой импульса.
+#6. График не будем делать. Так, убираем из записи в БД ВСЕ импульсы. Остаются только их параметры.
 
 
 try:
@@ -34,7 +34,7 @@ cur = conn.cursor()
 # cur.execute(script)
 # conn.commit()
 
-last_exp_id = 450
+last_exp_id = 69
 # Удаление ВСЕХ записей из таблицы "steps" по заданному условию
 cur.execute("DELETE FROM pulses")
 # Удаление записей из таблицы "steps" по заданному условию
@@ -68,7 +68,7 @@ def raw_file(element, get_every_pulse):
     impulses = pd.read_csv(os.path.join(source_folder, value[element]), delimiter=',', header=None)
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
     impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
-    impulses['Sum'] = impulses.iloc[:,8:63].mean(axis=1)
+    impulses['Sum'] = impulses.iloc[:,8:63].sum(axis=1)
     unique_steps = impulses['Step'].unique()
     # Initialize the final output dictionary
     final_output = {}
@@ -95,8 +95,10 @@ def raw_file(element, get_every_pulse):
 def extract_substance_name(row):
     start_index = row.find('data_') + len('data_')
     end_index = row.find('_', start_index)
+    comment = row[start_index:end_index]
+    s3_filename = row[start_index:len(row)-4]+'.zip'
     if start_index != -1 and end_index != -1:
-        return row[start_index:end_index]
+        return comment, s3_filename
     else:
         return "Название не найдено"
 #Дальше идем по объектам, считываем эти файлы, и записываем в БД. Нужно добавить создание JSON файлы для каждого эксперимента.
@@ -141,37 +143,38 @@ for index, value in enumerate(files_dict.values()):
     calc_id = calc_id
     start_time = datetime.strptime(value[0][-21:-4], "%d.%m.%y-%H.%M.%S")
     description = value[0][5:-22]
-    substance = extract_substance_name(value[0])
-    insert_query = "INSERT INTO experiment (start_time, description, substance, calc_id) VALUES (%s, %s, %s, %s) RETURNING id"
-    data = (start_time, description, substance, calc_id)
+    substance = extract_substance_name(value[0])[0]
+    s3_filename = extract_substance_name(value[0])[1]
+    insert_query = "INSERT INTO experiment (start_time, description, substance, calc_id, reper_file_link) VALUES (%s, %s, %s, %s, %s) RETURNING id"
+    data = (start_time, description, substance, calc_id, s3_filename)
     cur.execute(insert_query, data)
     inserted_record = cur.fetchone()
     exp_id = inserted_record[0]
     conn.commit()
-    #Получаем средние значения из файла value[0]
+    #Получаем средние значения из файла value[0] - этой файл data_*.* где находятся данные по амплиутуде!
     data_full = pd.read_csv(os.path.join(source_folder, value[0]), delimiter='\t', header=None)
-    data_full.columns = ['step_time', 'Step', 'A_Reper', 'A_Analyt', 'Ratio']
-
+    data_full.columns = ['step_time', 'Step', 'A_Analyt', 'A_Reper', 'Ratio']
     #Дальше нужно записывать шаги и импульсы на них. Информация о времени измерения и шаге находится в элементе value[0] нашего объекта с экспериментом
     #Все же давайте начнем с чтения большого файла value[2]. Читаем объект из value[2]
     raw_object = raw_file(2,2)
     raw_object_keys = list(raw_object.keys())
 
-    step_data = pd.read_csv(os.path.join(source_folder, value[0]), delimiter='\t', header=None)
-    step_data.columns = ['step_time', 'Step', 'A_Reper', 'A_Analyt', 'Ratio']
     exp_id = exp_id
     steps = []
-    for idx, step in step_data.iterrows():
+    for idx, step in data_full.iterrows():
         begin_time = time.time()
         object = data_impulse.iloc[0,[idx][0]]
         data_json = json.loads(object)
         step_0 = {"step": data_json["Numeric"],
                   "timestamp": step['step_time'],
-                  "av_pulses": {'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
-                                'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]},
-                  "av_analyt_amp": data_full.loc[idx]['A_Analyt'],
+                #   "av_pulses": {
+                #                 #Закомментим запись УСРЕДНЕННЫХ импульсов.
+                #                 # 'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
+                #                 # 'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]
+                #                 },
                   "av_reper_amp": data_full.loc[idx]['A_Reper'],
-                  "pulses": []
+                  "av_analyt_amp": data_full.loc[idx]['A_Analyt'],
+                  "pulses": [] #массив с импульсами на каждом шаге еще не заполнен
                   }
         start_time = step['step_time']
         step = step['Step'] # Тут по хорошему надо будет сделать И номер И позицию.
@@ -191,30 +194,12 @@ for index, value in enumerate(files_dict.values()):
         impulse_object = raw_object[raw_object_keys[idx]]
         tuple_data=[] #Сделать еще одну структуру словарь для записи JSON
         for i, j in enumerate(impulse_object['pulses']):
-            pulse_number = j['pulse']
+            pulse_number = int(1+j['pulse']/2)
             data_dict = {"pulse": pulse_number,
-                        "pulses": j['pulses'],
+#                       "pulses": {},# j['pulses'], Вот были импульсы для записи, я их убрал
                         "amplitude_reper": j['amplitude_reper'],
                         "amplitude_analyt": j['amplitude_analyt']
                   }
-            # Извлечение данных из JSON-объекта
-            impulse_reper = j['pulses']['impulse_reper']
-            impulse_analyt = j['pulses']['impulse_analyt']
-            amp_reper = j['amplitude_reper']
-            amp_analyt = j['amplitude_analyt']
-            # Построение графика
-            plt.plot(impulse_reper, label='Impulse Reper')
-            plt.plot(impulse_analyt, label='Impulse Analyt')
-            plt.xlabel('X-axis')
-            plt.ylabel('Y-axis')
-            plt.title('График двух массивов данных')
-            plt.legend()
-            # Отображение амплитуд
-            plt.text(s=f'Средняя амплитуда импульса Reper: {amp_reper}', y=0.7, x=110)
-            plt.text(s=f'Средняя амплитуда импульса Analyt: {amp_analyt}', y=0.5, x=110)
-            # plt.text(len(impulse_reper)-1, amp_reper, f'Amplitude Reper: {amp_reper}', va='bottom')
-            # plt.text(len(impulse_analyt)-1, amp_analyt, f'Amplitude Analyt: {amp_analyt}', va='bottom')
-            plt.show()
             step_0["pulses"].append(data_dict)
             data = (
                 step_id,
@@ -224,14 +209,14 @@ for index, value in enumerate(files_dict.values()):
                 j['amplitude_reper'], 
                 )
             tuple_data.append(data)
-            if i > 30:
-                break
+            # if i > 30:
+            #     break
         steps.append(step_0) # Есть ошибка, нужно номер импульса добавить для записи в БД. таблица pulses.
-        # insert_query = "INSERT INTO pulses (step_id, pulse_number, analyt_amp, reper_amp) VALUES (%s, %s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
-        # cur.executemany(insert_query, tuple_data)
-        # conn.commit()
-        if idx == 3:
-            break
+        insert_query = "INSERT INTO pulses (step_id, pulse_number, analyt_amp, reper_amp) VALUES (%s, %s, %s, %s)" #Убрал объект с импульсами. Долго записывает. Но опять же для JSON он будет нужен.
+        cur.executemany(insert_query, tuple_data)
+        conn.commit()
+        # if idx == 3:
+        #     break
     #Данные в JSON файл: 
     my_measurement = {
         'dataset': 'Dataset1',
@@ -240,6 +225,7 @@ for index, value in enumerate(files_dict.values()):
         'comment': description,
         'substance': substance,
         'timestamp': value[0][-21:-4],
+        'file_link': s3_filename,
         'steps': steps}
     with open(output_filename, 'w') as file:
         json.dump(my_measurement, file)
@@ -247,7 +233,7 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 2:
+    if index > 3:
         break
 cur.close()
 conn.close()
