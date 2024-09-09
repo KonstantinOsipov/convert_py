@@ -68,8 +68,9 @@ def raw_file(element, get_every_pulse): #Параметр get_every_pulse нуж
     impulses = pd.read_csv(os.path.join(source_folder, value[element]), delimiter=',', header=None)
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
     impulses[['Impulse', 'Step', 'Channel']] = impulses[['Impulse', 'Step', 'Channel']].astype('category')
-    impulses['Threshold'] = impulses.iloc[:,len(impulses.columns)-100:len(impulses.columns)].mean(axis=1)
-    impulses['Sum'] = impulses.iloc[:,8:63].sum(axis=1) - impulses['Threshold']
+    impulses['Threshold'] = impulses.iloc[:,len(impulses.columns)-100:len(impulses.columns)].mean(axis=1) * (-1)
+    impulses.loc[:,[str(i) for i in range(1, 601)]] = impulses.loc[:,[str(i) for i in range(1, 601)]].add(impulses['Threshold'],axis=0)
+    impulses['Sum'] = impulses.iloc[:,7:63].sum(axis=1)
     unique_steps = impulses['Step'].unique()
     # Initialize the final output dictionary
     final_output = {}
