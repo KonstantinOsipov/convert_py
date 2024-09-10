@@ -135,7 +135,7 @@ for index, row in result_2.iterrows():
     substance = row['Substance']
     calc_id = calc_id
     reper_file_link = reper_file
-    analyt_file_link = analyt_file
+    analyt_file_link = analyt_file #Вот эти ссылки наверное нужно будет убрать из базы. думаю одну ссылку оставлять на имя файла в S3 хранилище
     insert_query = "INSERT INTO  experiment (start_time, description, substance, calc_id, reper_file_link, analyt_file_link) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
     data = (start_time, description, substance, calc_id, reper_file_link, analyt_file_link)
     cur.execute(insert_query, data)
@@ -152,14 +152,14 @@ for index, row in result_2.iterrows():
         object = data_impulse.iloc[0,i[1]]
         try:
             data_json = json.loads(object)
-            av_pulses = {'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
-                        'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]},
+            # av_pulses = {'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
+            #             'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]},
             step = {
                     "step": data_json["Numeric"],
                     "timestamp": (data_json["date/time string"])[0:11],
-                    "av_pulses": av_pulses[0],
-                    "av_analyt_amp": float(data_full_tr.loc['A_Analyt',i[1]].replace(",", ".")),
+#                   "av_pulses": av_pulses[0],
                     "av_reper_amp": float(data_full_tr.loc['A_Reper',i[1]].replace(",", ".")),
+                    "av_analyt_amp": float(data_full_tr.loc['A_Analyt',i[1]].replace(",", ".")),
                     "pulses": []
                     #Данные с сигналами убраны из структуры json. Надо воткнуть smoothed обратно.                 
                     }
@@ -169,7 +169,7 @@ for index, row in result_2.iterrows():
                 (data_json["date/time string"])[0:11].replace(",", "."),
                 data_json["Numeric"], # это шаг. 
                 delay_pulses,
-                json.dumps(av_pulses[0]),
+#               json.dumps(av_pulses[0]),
                 data_full_tr.loc['A_Analyt',i[1]].replace(",", "."),
                 data_full_tr.loc['A_Reper',i[1]].replace(",", ".")
                 )
@@ -179,7 +179,7 @@ for index, row in result_2.iterrows():
             steps.append(step)
         except TypeError:
             pass
-    insert_query = "INSERT INTO steps (exp_id, start_time, step, delay_pulses, av_pulses, av_analyt_amp, av_reper_amp) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+    insert_query = "INSERT INTO steps (exp_id, start_time, step, delay_pulses, av_analyt_amp, av_reper_amp) VALUES (%s, %s, %s, %s, %s, %s)" # av_pulses, я убрал из выгрузки
     cur.executemany(insert_query, tuple_data)
     conn.commit()
     end_time = time.time()
@@ -200,7 +200,7 @@ for index, row in result_2.iterrows():
     #   file.write(json_data)
         json.dump(my_measurement, file)
     print('Записан файл...' + output_filename)
-    if index >= 2:
+    if index >= 10:
         break
 cur.close()
 conn.close()
