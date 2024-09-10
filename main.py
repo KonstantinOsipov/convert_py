@@ -14,7 +14,8 @@ source_folder = 'd:/Work/2023/TimeWeb_data/'
 files = os.listdir(source_folder)
 files = [file for file in files if file.endswith(".dat")]
 print(len(files))
-#Сформируем пути для записи выходных данных
+#Сформируем пути для записи выходных данных. 
+#Погоди, так эти выходные файлы уже не записываются. Сейчас просто все пишется в один JSON.
 path_array = source_folder.split('/')
 path_array = path_array[0:len(path_array)-2]
 path_array.append('Output')
@@ -124,20 +125,21 @@ for index, row in result_2.iterrows():
     # Подтверждение изменений и закрытие соединения
     conn.commit()
 
-    link_str = row['FULL']
-    Reper_link = link_str.replace('FULL', 'Reper')
-    Analyt_link = link_str.replace('FULL', 'Analyt')
-    reper_file = os.path.join(ready_paths[1], Reper_link)
-    analyt_file = os.path.join(ready_paths[1], Analyt_link)
+    s3_filename = row['FULL']
+    # # Reper_link = link_str.replace('FULL', 'Reper')
+    # # Analyt_link = link_str.replace('FULL', 'Analyt')
+    # reper_file = os.path.join(ready_paths[1], Reper_link)
+    # analyt_file = os.path.join(ready_paths[1], Analyt_link)
     #Пишем в таблицу "experiment"
     start_time = datetime.strptime(find_last_index(row['Impulse'])[1], "%m.%d.%Y_%H.%M.%S")
     description = (row['Impulse'])[13:-19]
     substance = row['Substance']
     calc_id = calc_id
-    reper_file_link = reper_file
-    analyt_file_link = analyt_file #Вот эти ссылки наверное нужно будет убрать из базы. думаю одну ссылку оставлять на имя файла в S3 хранилище
-    insert_query = "INSERT INTO  experiment (start_time, description, substance, calc_id, reper_file_link, analyt_file_link) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
-    data = (start_time, description, substance, calc_id, reper_file_link, analyt_file_link)
+    print(start_time)
+    # reper_file_link = reper_file
+    # analyt_file_link = analyt_file #Вот эти ссылки наверное нужно будет убрать из базы. думаю одну ссылку оставлять на имя файла в S3 хранилище
+    insert_query = "INSERT INTO  experiment (start_time, description, substance, calc_id, reper_file_link) VALUES (%s, %s, %s, %s, %s) RETURNING id"
+    data = (start_time, description, substance, calc_id, s3_filename)
     cur.execute(insert_query, data)
     inserted_record = cur.fetchone()
     exp_id = inserted_record[0]
@@ -146,7 +148,6 @@ for index, row in result_2.iterrows():
     steps = []
     df_reper = pd.DataFrame()
     df_analyt = pd.DataFrame()
-    begin_time = time.time()
     tuple_data=[] #Сделать еще одну структуру массив для записи в БД executemany
     for i in zip(data_impulse, data_full_tr):
         object = data_impulse.iloc[0,i[1]]
@@ -182,9 +183,6 @@ for index, row in result_2.iterrows():
     insert_query = "INSERT INTO steps (exp_id, start_time, step, delay_pulses, av_analyt_amp, av_reper_amp) VALUES (%s, %s, %s, %s, %s, %s)" # av_pulses, я убрал из выгрузки
     cur.executemany(insert_query, tuple_data)
     conn.commit()
-    end_time = time.time()
-    execution_time = end_time - begin_time
-    print("Время выполнения операции: {:.5f} секунд".format(execution_time))
     output_filename = os.path.join(output_folder, row['Impulse'][13:-4] + ".json")
     my_measurement = {
         'dataset': 'Dataset0',
@@ -193,13 +191,13 @@ for index, row in result_2.iterrows():
         'comment': find_last_index(row['Impulse'])[0],
         'substance': substance,
         'timestamp': find_last_index(row['Impulse'])[1],
+        'file_link': s3_filename,
         'steps': steps}
     #json_data = json.dumps(my_measurement, separators=(',', ':'))
     # Записываем JSON
     with open(output_filename, 'w') as file:
     #   file.write(json_data)
         json.dump(my_measurement, file)
-    print('Записан файл...' + output_filename)
     if index >= 10:
         break
 cur.close()
