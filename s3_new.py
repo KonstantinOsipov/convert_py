@@ -143,12 +143,12 @@ for index, value in enumerate(files_dict.values()):
     #Данные для таблицы Experiment
     #Пишем в таблицу "experiment"
     calc_id = calc_id
-    start_time = datetime.strptime(value[0][-21:-4], "%d.%m.%y-%H.%M.%S")
+    exp_start_time = datetime.strptime(value[0][-21:-4], "%d.%m.%y-%H.%M.%S")
     description = value[0][5:-22]
     substance = extract_substance_name(value[0])[0]
     s3_filename = extract_substance_name(value[0])[1]
     insert_query = "INSERT INTO experiment (start_time, description, substance, calc_id, reper_file_link) VALUES (%s, %s, %s, %s, %s) RETURNING id"
-    data = (start_time, description, substance, calc_id, s3_filename)
+    data = (exp_start_time, description, substance, calc_id, s3_filename)
     cur.execute(insert_query, data)
     inserted_record = cur.fetchone()
     exp_id = inserted_record[0]
@@ -160,11 +160,10 @@ for index, value in enumerate(files_dict.values()):
     #Все же давайте начнем с чтения большого файла value[2]. Читаем объект из value[2]
     raw_object = raw_file(2,2)
     raw_object_keys = list(raw_object.keys())
-
+    print(exp_start_time)
     exp_id = exp_id
     steps = []
     for idx, step in data_full.iterrows():
-        begin_time = time.time()
         object = data_impulse.iloc[0,[idx][0]]
         data_json = json.loads(object)
         step_0 = {"step": data_json["Numeric"],
@@ -190,9 +189,7 @@ for index, value in enumerate(files_dict.values()):
         inserted_record = cur.fetchone()
         step_id = inserted_record[0]
         conn.commit()
-        end_time = time.time()
-        execution_time = end_time - begin_time
-        print(f'Записали шаг {data_json["Numeric"]}, эксперимента {value[0]} прошло времени...{execution_time:.5f} секунд')
+        print(f'Записали шаг {data_json["Numeric"]}, эксперимента {value[0]}')
         impulse_object = raw_object[raw_object_keys[idx]]
         tuple_data=[] #Сделать еще одну структуру словарь для записи JSON
         for i, j in enumerate(impulse_object['pulses']):
@@ -226,7 +223,7 @@ for index, value in enumerate(files_dict.values()):
         'accum_pulses': accum,
         'comment': description,
         'substance': substance,
-        'timestamp': value[0][-21:-4],
+        'timestamp': exp_start_time.isoformat(),
         'file_link': s3_filename,
         'steps': steps}
     with open(output_filename, 'w') as file:

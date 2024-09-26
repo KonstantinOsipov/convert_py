@@ -7,6 +7,8 @@ import shutil
 import psycopg2
 import time
 from datetime import datetime
+from my_functions import find_last_index
+
 #Внимание! 01.05.2024 Поменял структуру БД. Эти файлы должны записываться в новую структуру. И по файлам JSON получается
 #Открываем папку. Считываем все .dat. И складываем в DataFrame
 #Блин, забыл номер импульса добавить в таблицу pulses. Но здесь он и не нужен.
@@ -59,15 +61,7 @@ result_2 = pd.DataFrame({
 
 result_2['Substance'] = result_2['FULL'].apply(extract_substance_name)
 
-def find_last_index(text):
-    start = text.find('Impulse_')
-    end = start + len('Impulse_')
-    timestamp = text[len(text)-18:len(text)-4]
-    date_parts = timestamp.split("_")
-    timestamp = date_parts[0] + ".2023_" + date_parts[1]
-    dt = datetime.strptime(timestamp, "%m.%d.%Y_%H.%M.%S")
-    iso_timestamp = dt.strftime("%Y-%m-%dT%H:%M:%S")
-    return text[end:len(text)-4], iso_timestamp
+
 
 try:
     # пытаемся подключиться к базе данных
