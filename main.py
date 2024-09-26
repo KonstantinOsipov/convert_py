@@ -10,6 +10,7 @@ from datetime import datetime
 #Внимание! 01.05.2024 Поменял структуру БД. Эти файлы должны записываться в новую структуру. И по файлам JSON получается
 #Открываем папку. Считываем все .dat. И складываем в DataFrame
 #Блин, забыл номер импульса добавить в таблицу pulses. Но здесь он и не нужен.
+#1. 26.09 - Сделать одинаковый нормальный Timestamp "год-месяц-день час:минута:секунда".
 source_folder = 'd:/Work/2023/TimeWeb_data/'
 files = os.listdir(source_folder)
 files = [file for file in files if file.endswith(".dat")]
@@ -64,7 +65,9 @@ def find_last_index(text):
     timestamp = text[len(text)-18:len(text)-4]
     date_parts = timestamp.split("_")
     timestamp = date_parts[0] + ".2023_" + date_parts[1]
-    return text[end:len(text)-4], timestamp
+    dt = datetime.strptime(timestamp, "%m.%d.%Y_%H.%M.%S")
+    iso_timestamp = dt.strftime("%Y-%m-%dT%H:%M:%S")
+    return text[end:len(text)-4], iso_timestamp
 
 try:
     # пытаемся подключиться к базе данных
@@ -131,7 +134,7 @@ for index, row in result_2.iterrows():
     # reper_file = os.path.join(ready_paths[1], Reper_link)
     # analyt_file = os.path.join(ready_paths[1], Analyt_link)
     #Пишем в таблицу "experiment"
-    start_time = datetime.strptime(find_last_index(row['Impulse'])[1], "%m.%d.%Y_%H.%M.%S")
+    start_time = datetime.strptime(find_last_index(row['Impulse'])[1], "%Y-%m-%dT%H:%M:%S")
     description = (row['Impulse'])[13:-19]
     substance = row['Substance']
     calc_id = calc_id
@@ -198,7 +201,7 @@ for index, row in result_2.iterrows():
     with open(output_filename, 'w') as file:
     #   file.write(json_data)
         json.dump(my_measurement, file)
-    if index >= 10:
-        break
+    # if index >= 10:
+    #     break
 cur.close()
 conn.close()
