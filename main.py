@@ -152,9 +152,10 @@ for index, row in result_2.iterrows():
             data_json = json.loads(object)
             # av_pulses = {'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
             #             'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]},
+            step_time = (data_json["date/time string"])[0:11].replace(",", ".")
             step = {
                     "step": data_json["Numeric"],
-                    "timestamp": (data_json["date/time string"])[0:11],
+                    "timestamp": step_time,
 #                   "av_pulses": av_pulses[0],
                     "av_reper_amp": float(data_full_tr.loc['A_Reper',i[1]].replace(",", ".")),
                     "av_analyt_amp": float(data_full_tr.loc['A_Analyt',i[1]].replace(",", ".")),
@@ -164,7 +165,7 @@ for index, row in result_2.iterrows():
             #Записываем данные в таблицу measurements
             data = (
                 exp_id,
-                (data_json["date/time string"])[0:11].replace(",", "."),
+                step_time,
                 data_json["Numeric"], # это шаг. 
                 delay_pulses,
 #               json.dumps(av_pulses[0]),

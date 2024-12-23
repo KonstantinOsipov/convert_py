@@ -34,18 +34,6 @@ cur = conn.cursor()
 # cur.execute(script)
 # conn.commit()
 
-last_exp_id = 69
-# Удаление ВСЕХ записей из таблицы "steps" по заданному условию
-cur.execute("DELETE FROM pulses")
-# Удаление записей из таблицы "steps" по заданному условию
-cur.execute("DELETE FROM steps WHERE exp_id > %s", (last_exp_id,))
-
-# Удаление записей из таблицы "experiment" по заданному условию
-cur.execute("DELETE FROM experiment WHERE id > %s", (last_exp_id,))
-
-# Подтверждение изменений и закрытие соединения
-conn.commit()
-
 #Через S3 не получается. Все равно нужно копировать файлы чтоыб их распаковать
 #Указываем папку с файлами. Считываем все *.dat . И складываем в DataFrame
 source_folder = 'd:/Work/2024/data2024/raw'
@@ -105,6 +93,7 @@ def extract_substance_name(row):
         return "Название не найдено"
 #Дальше идем по объектам, считываем эти файлы, и записываем в БД. Нужно добавить создание JSON файлы для каждого эксперимента.
 for index, value in enumerate(files_dict.values()):
+    print(index)
     data_impulse = pd.read_csv(os.path.join(source_folder, value[1]), delimiter='\t', header=None)
     output_filename = os.path.join(source_folder, value[0][5:-4] + ".json")
     print(output_filename)
@@ -160,14 +149,15 @@ for index, value in enumerate(files_dict.values()):
     #Все же давайте начнем с чтения большого файла value[2]. Читаем объект из value[2]
     raw_object = raw_file(2,2)
     raw_object_keys = list(raw_object.keys())
-    print(exp_start_time)
     exp_id = exp_id
     steps = []
     for idx, step in data_full.iterrows():
         object = data_impulse.iloc[0,[idx][0]]
+        step_time = step['step_time']
+        step_time = step_time.replace(',', '.')
         data_json = json.loads(object)
         step_0 = {"step": data_json["Numeric"],
-                  "timestamp": step['step_time'],
+                  "timestamp": step_time,
                 #   "av_pulses": {
                 #                 #Закомментим запись УСРЕДНЕННЫХ импульсов.
                 #                 # 'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
@@ -177,11 +167,10 @@ for index, value in enumerate(files_dict.values()):
                   "av_analyt_amp": data_full.loc[idx]['A_Analyt'],
                   "pulses": [] #массив с импульсами на каждом шаге еще не заполнен
                   }
-        start_time = step['step_time']
         step = step['Step'] # Тут по хорошему надо будет сделать И номер И позицию.
         delay_pulses = 200
         insert_query = "INSERT INTO steps (start_time, step, delay_pulses, exp_id, av_analyt_amp, av_reper_amp) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id"
-        averaged = (start_time, step, delay_pulses, exp_id,
+        averaged = (step_time, step, delay_pulses, exp_id,
                 data_full.loc[idx]['A_Analyt'],
                 data_full.loc[idx]['A_Reper']
                 )
@@ -189,7 +178,7 @@ for index, value in enumerate(files_dict.values()):
         inserted_record = cur.fetchone()
         step_id = inserted_record[0]
         conn.commit()
-        print(f'Записали шаг {data_json["Numeric"]}, эксперимента {value[0]}')
+        # print(f'Записали шаг {data_json["Numeric"]}, эксперимента {value[0]}')
         impulse_object = raw_object[raw_object_keys[idx]]
         tuple_data=[] #Сделать еще одну структуру словарь для записи JSON
         for i, j in enumerate(impulse_object['pulses']):
