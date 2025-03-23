@@ -37,22 +37,55 @@ cur = conn.cursor()
 
 #Через S3 не получается. Все равно нужно копировать файлы чтоыб их распаковать
 #Указываем папку с файлами. Считываем все *.dat . И складываем в DataFrame
+
 source_folder = 'd:/Work/2024/data2024/raw'
+
+# Получаем список всех файлов в папке
 files = os.listdir(source_folder)
-files = [file for file in files if file.endswith(".dat")]
-print(len(files))
-#Теперь имена файлов сведем в таблицу для дальнейшего считывания и распределения по объектам в БД
-# for file in files:
-#     print(file[-21:-4])
+
+# Фильтруем по расширению
+dat_files = [file for file in files if file.endswith(".dat")]
+json_files = [file for file in files if file.endswith(".json")]
+
+# Функция извлечения даты из имени файла
+def extract_date(filename):
+    match = re.search(r'\d{2}\.\d{2}\.\d{2}-\d{2}\.\d{2}\.\d{2}', filename)
+    return match.group(0) if match else None
+
+# Извлекаем даты из .json файлов
+json_dates = set()
+for file in json_files:
+    date = extract_date(file)
+    if date:
+        json_dates.add(date)
+
+# Формируем словарь .dat файлов, исключая те, у которых уже есть соответствующий .json
 files_dict = {}
-for index, file_name in enumerate(files):
-    date = file_name[-21:-4]  # Получаем дату из имени файла
+skipped_dates = set()
+
+for file_name in dat_files:
+    date = extract_date(file_name)
+    if not date:
+        continue  # Пропускаем, если дату не удалось извлечь
+    if date in json_dates:
+        skipped_dates.add(date)
+        continue
     if date in files_dict:
         files_dict[date].append(file_name)
     else:
         files_dict[date] = [file_name]
-print(f'Число объектов, {len(files_dict)}'
-      )
+
+# Вывод результатов
+print(f'Число объектов без json-файлов: {len(files_dict)}')
+
+# Лог пропущенных дат
+if skipped_dates:
+    print('\nПропущены следующие даты (из-за наличия .json файла):')
+    for d in sorted(skipped_dates):
+        print(f'  {d}')
+else:
+    print('\nВсе даты уникальны — .json файлов с такими датами не найдено.')
+
 def raw_file(element, get_every_pulse): #Параметр get_every_pulse нужен для того, чтобы прореживать импульсы. В данном случае мы берем каждый второй импульс
     impulses = pd.read_csv(os.path.join(source_folder, value[element]), delimiter=',', header=None)
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
