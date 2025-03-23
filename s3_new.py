@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 #4. Удялять бы из таблиц experiment и step все записи, кроме 2023 года.
 #5. 03.09.2024 Пока непонятно как дальше быть. Не охота пихать все импульсы в БД. Пусть лежат в S3 хранилище, и будет ссылка на них.
 #6. График не будем делать. Так, убираем из записи в БД ВСЕ импульсы. Остаются только их параметры.
+#7. Хочу вернуть запись усредненных импульсов, и самих импульсов в файлы json.
 
 
 try:
@@ -72,10 +73,10 @@ def raw_file(element, get_every_pulse): #Параметр get_every_pulse нуж
             df_impulse = df_step[df_step['Impulse'] == impulse_value]
             if impulse_value % get_every_pulse == 0:
                 pulses_dict={"pulse": impulse_value,
-                            # "pulses": { Объект с импульсами не нужен, не буедм его считывать. Это ускорит дело.
-                            #     "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
-                            #     "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
-                            # },
+                            "pulses": { #Здесь можно закоментить считывание объекта. Объект с импульсами не нужен, не будем его считывать. Это ускорит дело.
+                                "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
+                                "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
+                            },
                             "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],8),
                             "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],8)
                             }
@@ -158,11 +159,10 @@ for index, value in enumerate(files_dict.values()):
         data_json = json.loads(object)
         step_0 = {"step": data_json["Numeric"],
                   "timestamp": step_time,
-                #   "av_pulses": {
-                #                 #Закомментим запись УСРЕДНЕННЫХ импульсов.
-                #                 # 'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
-                #                 # 'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]
-                #                 },
+                  "av_pulses": { #Если нужно, можно закоментить запись УСРЕДНЕННЫХ импульсов.
+                                'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
+                                'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]
+                                },
                   "av_reper_amp": data_full.loc[idx]['A_Reper'],
                   "av_analyt_amp": data_full.loc[idx]['A_Analyt'],
                   "pulses": [] #массив с импульсами на каждом шаге еще не заполнен
@@ -184,7 +184,7 @@ for index, value in enumerate(files_dict.values()):
         for i, j in enumerate(impulse_object['pulses']):
             pulse_number = int(1+j['pulse']/2)
             data_dict = {"pulse": pulse_number,
-#                       "pulses": {},# j['pulses'], Вот были импульсы для записи, я их убрал
+                        "pulses": j['pulses'], #7. Можно закоментировать объект с имульсами для записи в файл. Вот были импульсы для записи, я их убрал
                         "amplitude_reper": j['amplitude_reper'],
                         "amplitude_analyt": j['amplitude_analyt']
                   }
@@ -221,7 +221,7 @@ for index, value in enumerate(files_dict.values()):
 
 #Все это работает, но импульсы записываются очень медленно. Думаю пока обойтись только записью амплитуд.   
 
-    if index > 5:
-        break
+    # if index > 5:
+    #     break
 cur.close()
 conn.close()
