@@ -38,7 +38,17 @@ for file_name in dat_files:
     else:
         files_dict[date] = [file_name]
 
+# После сбора всех файлов — фильтрация: только даты с ровно 3 файлами
+dates_to_remove = []
+for date, file_list in files_dict.items():
+    if len(file_list) != 3:
+        skipped_dates.add(date)
+        dates_to_remove.append(date)
+for date in dates_to_remove:
+    del files_dict[date]
 print(f'Число объектов без json-файлов: {len(files_dict)}')
+print(files_dict)
+
 if skipped_dates:
     print('\nПропущены следующие даты (из-за наличия .json файла):')
     for d in sorted(skipped_dates):
@@ -86,17 +96,26 @@ def extract_substance_name(row):
     else:
         return "Название не найдено"
 
-for index, value in enumerate(files_dict.values()):
-    print(index, value)
+
+# Для одинаковых названий веществ использовать одинаковый индекс
+substance_name_to_index = {}
+substance_counter = 1
+for value in files_dict.values():
+    print(value)
     if len(value) < 2:
-        print(f"Пропускаем: index={index}, value={value} (меньше 2 файлов)")
+        print(f"Пропускаем: value={value} (меньше 2 файлов)")
         continue
     data_impulse = pd.read_csv(os.path.join(source_folder, value[1]), delimiter='\t', header=None)
     exp_start_time = datetime.strptime(value[0][-21:-4], "%d.%m.%y-%H.%M.%S")
     exp_start_time = exp_start_time.replace(month=9, year=2025)
-    substance = f"Substance_{index+1}"
+    substance_name = extract_substance_name(value[0])[0]
+    if substance_name not in substance_name_to_index:
+        substance_name_to_index[substance_name] = substance_counter
+        substance_counter += 1
+    substance_index = substance_name_to_index[substance_name]
+    substance = f"Substance_{substance_index}"
     description = substance
-    s3_filename = f"{description}_{exp_start_time.strftime('%Y-%m-%d_%H.%M.%S')}.json" #По идее ссылка на файл должна остаться без изменений
+    s3_filename = f"{description}_{exp_start_time.strftime('%Y-%m-%d_%H.%M.%S')}.json"
     output_filename = os.path.join(source_folder, s3_filename)
     print(output_filename)
     match = re.search(r'_accum=(\d+)_slide=(\d+)', json.loads(data_impulse.iloc[0,0])["date/time string"])
