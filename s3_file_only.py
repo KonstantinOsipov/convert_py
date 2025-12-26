@@ -4,6 +4,7 @@ import re
 import json
 from datetime import datetime
 import matplotlib.pyplot as plt
+import numpy
 
 # Указываем папку с файлами. Считываем все *.dat и *.json. Складываем в DataFrame
 source_folder = 'd:/Work/2024/data2024/raw'
@@ -44,6 +45,16 @@ if skipped_dates:
 else:
     print('\nВсе даты уникальны — .json файлов с такими датами не найдено.')
 
+def format_float_smart(x, sci_threshold=1e-4):
+    """Форматирует float: обычный вид для |x| >= sci_threshold, иначе научная нотация."""
+    if x == 0.0:
+        return "0.0"
+    if abs(x) < sci_threshold:
+        return f"{x:.6e}"          # например: 5.09e-04
+    else:
+        s = f"{x:.8f}".rstrip('0').rstrip('.')
+        return s if '.' in s else s + ".0"  # гарантируем десятичную точку, если нужно
+
 def raw_file(element, get_every_pulse):
     impulses = pd.read_csv(os.path.join(source_folder, value[element]), delimiter=',', header=None)
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
@@ -64,8 +75,8 @@ def raw_file(element, get_every_pulse):
             if impulse_value % get_every_pulse == 0:
                 pulses_dict={"pulse": impulse_value,
                             "pulses": {
-                                "impulse_reper": df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten().tolist(),
-                                "impulse_analyt": df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten().tolist(),
+                                "impulse_reper": [round(float(x), 8) for x in df_impulse[df_impulse['Channel']=='Reper'].iloc[:,3:603].values.flatten()],
+                                "impulse_analyt": [round(float(x), 8) for x in df_impulse[df_impulse['Channel']=='Analyt'].iloc[:,3:603].values.flatten()]
                             },
                             "amplitude_reper": round(list(df_impulse[df_impulse['Channel'] == 'Reper']['Sum'])[0],8),
                             "amplitude_analyt": round(list(df_impulse[df_impulse['Channel'] == 'Analyt']['Sum'])[0],8)
@@ -74,19 +85,22 @@ def raw_file(element, get_every_pulse):
         final_output[str(f"step_{step_value}")] = output_dict
     return final_output
 
-def extract_substance_name(row):
-    start_index = row.find('data_') + len('data_')
-    end_index = row.find('_', start_index)
-    comment = row[start_index:end_index]
-    s3_filename = row[start_index:len(row)-4]+'.zip'
-    if start_index != -1 and end_index != -1:
-        return comment, s3_filename
-    else:
-        return "Название не найдено"
+# def extract_substance_name(row):
+#     start_index = row.find('data_') + len('data_')
+#     end_index = row.find('_', start_index)
+#     comment = row[start_index:end_index]
+#     s3_filename = row[start_index:len(row)-4]+'.zip'
+#     if start_index != -1 and end_index != -1:
+#         return comment, s3_filename
+#     else:
+#         return "Название не найдено"
 
 for index, value in enumerate(files_dict.values()):
     print(index)
     data_impulse = pd.read_csv(os.path.join(source_folder, value[1]), delimiter='\t', header=None)
+    description = f"Substance_{index+1}"
+    substance = f"Substance_{index+1}"
+    s3_filename = f"Substance_{index+1}.dat" #По идее ссылка на файл должна остаться без изменений
     output_filename = os.path.join(source_folder, s3_filename)
     print(output_filename)
     match = re.search(r'_accum=(\d+)_slide=(\d+)', json.loads(data_impulse.iloc[0,0])["date/time string"])
@@ -97,9 +111,7 @@ for index, value in enumerate(files_dict.values()):
     pulse_width_pts = 60
     end_offset_pts = 400
     exp_start_time = datetime.strptime(value[0][-21:-4], "%d.%m.%y-%H.%M.%S")
-    description = f"Substance_{index+1}"
-    substance = f"Substance_{index+1}"
-    s3_filename = f"Substance_{index+1}.zip"
+    exp_start_time = exp_start_time.replace(month=9, year=2025)
     data_full = pd.read_csv(os.path.join(source_folder, value[0]), delimiter='\t', header=None)
     data_full.columns = ['step_time', 'Step', 'A_Analyt', 'A_Reper', 'Ratio']
     raw_object = raw_file(2,2)
@@ -113,8 +125,8 @@ for index, value in enumerate(files_dict.values()):
         step_0 = {"step": data_json["Numeric"],
                   "timestamp": step_time,
                   "av_pulses": {
-                                'impulse_reper': [round(num,8) for num in data_json["0-Rep;1-Sig"][0] ],
-                                'impulse_analyt': [round(num,8) for num in data_json["0-Rep;1-Sig"][1] ]
+                                'impulse_reper': data_json["0-Rep;1-Sig"][0],
+                                'impulse_analyt': data_json["0-Rep;1-Sig"][1]
                                 },
                   "av_reper_amp": data_full.loc[idx]['A_Reper'],
                   "av_analyt_amp": data_full.loc[idx]['A_Analyt'],
@@ -125,6 +137,8 @@ for index, value in enumerate(files_dict.values()):
         impulse_object = raw_object[raw_object_keys[idx]]
         for i, j in enumerate(impulse_object['pulses']):
             pulse_number = int(1+j['pulse']/2)
+            if pulse_number > 20:
+                break
             data_dict = {"pulse": pulse_number,
                         "pulses": j['pulses'],
                         "amplitude_reper": j['amplitude_reper'],
