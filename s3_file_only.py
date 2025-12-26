@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 import numpy
 
 # Указываем папку с файлами. Считываем все *.dat и *.json. Складываем в DataFrame
-source_folder = 'd:/Work/2024/data2024/raw'
+source_folder = 'd:/Work/2024/data2024/panel'
+
 
 files = os.listdir(source_folder)
 dat_files = [file for file in files if file.endswith(".dat")]
@@ -45,16 +46,6 @@ if skipped_dates:
 else:
     print('\nВсе даты уникальны — .json файлов с такими датами не найдено.')
 
-def format_float_smart(x, sci_threshold=1e-4):
-    """Форматирует float: обычный вид для |x| >= sci_threshold, иначе научная нотация."""
-    if x == 0.0:
-        return "0.0"
-    if abs(x) < sci_threshold:
-        return f"{x:.6e}"          # например: 5.09e-04
-    else:
-        s = f"{x:.8f}".rstrip('0').rstrip('.')
-        return s if '.' in s else s + ".0"  # гарантируем десятичную точку, если нужно
-
 def raw_file(element, get_every_pulse):
     impulses = pd.read_csv(os.path.join(source_folder, value[element]), delimiter=',', header=None)
     impulses.columns = ['Impulse', 'Step', 'Channel'] + [str(i) for i in range(1, 601)]
@@ -85,22 +76,27 @@ def raw_file(element, get_every_pulse):
         final_output[str(f"step_{step_value}")] = output_dict
     return final_output
 
-# def extract_substance_name(row):
-#     start_index = row.find('data_') + len('data_')
-#     end_index = row.find('_', start_index)
-#     comment = row[start_index:end_index]
-#     s3_filename = row[start_index:len(row)-4]+'.zip'
-#     if start_index != -1 and end_index != -1:
-#         return comment, s3_filename
-#     else:
-#         return "Название не найдено"
+def extract_substance_name(row):
+    start_index = row.find('data_') + len('data_')
+    end_index = row.find('_', start_index)
+    comment = row[start_index:end_index]
+    s3_filename = row[start_index:len(row)-4]+'.zip'
+    if start_index != -1 and end_index != -1:
+        return comment, s3_filename
+    else:
+        return "Название не найдено"
 
 for index, value in enumerate(files_dict.values()):
-    print(index)
+    print(index, value)
+    if len(value) < 2:
+        print(f"Пропускаем: index={index}, value={value} (меньше 2 файлов)")
+        continue
     data_impulse = pd.read_csv(os.path.join(source_folder, value[1]), delimiter='\t', header=None)
-    description = f"Substance_{index+1}"
+    exp_start_time = datetime.strptime(value[0][-21:-4], "%d.%m.%y-%H.%M.%S")
+    exp_start_time = exp_start_time.replace(month=9, year=2025)
     substance = f"Substance_{index+1}"
-    s3_filename = f"Substance_{index+1}.dat" #По идее ссылка на файл должна остаться без изменений
+    description = substance
+    s3_filename = f"{description}_{exp_start_time.strftime('%Y-%m-%d_%H.%M.%S')}.json" #По идее ссылка на файл должна остаться без изменений
     output_filename = os.path.join(source_folder, s3_filename)
     print(output_filename)
     match = re.search(r'_accum=(\d+)_slide=(\d+)', json.loads(data_impulse.iloc[0,0])["date/time string"])
@@ -110,11 +106,9 @@ for index, value in enumerate(files_dict.values()):
     delay_pts = 5
     pulse_width_pts = 60
     end_offset_pts = 400
-    exp_start_time = datetime.strptime(value[0][-21:-4], "%d.%m.%y-%H.%M.%S")
-    exp_start_time = exp_start_time.replace(month=9, year=2025)
     data_full = pd.read_csv(os.path.join(source_folder, value[0]), delimiter='\t', header=None)
     data_full.columns = ['step_time', 'Step', 'A_Analyt', 'A_Reper', 'Ratio']
-    raw_object = raw_file(2,2)
+    raw_object = raw_file(2,3)
     raw_object_keys = list(raw_object.keys())
     steps = []
     for idx, step in data_full.iterrows():
@@ -137,7 +131,7 @@ for index, value in enumerate(files_dict.values()):
         impulse_object = raw_object[raw_object_keys[idx]]
         for i, j in enumerate(impulse_object['pulses']):
             pulse_number = int(1+j['pulse']/2)
-            if pulse_number > 20:
+            if pulse_number > 30:
                 break
             data_dict = {"pulse": pulse_number,
                         "pulses": j['pulses'],
